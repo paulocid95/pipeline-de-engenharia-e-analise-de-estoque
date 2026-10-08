@@ -1,29 +1,22 @@
 # 📦 Sistema Integrado de Engenharia de Dados, Análise e Monitoramento de Estoque
 
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://estoque-dashboard-live.streamlit.app)
+
+> 🚀 **Dashboard em Produção:** Acesse a aplicação interativa em tempo real: [estoque-dashboard-live.streamlit.app](https://estoque-dashboard-live.streamlit.app)
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)
-
 ![Pandas](https://img.shields.io/badge/Pandas-2.0%2B-150458?logo=pandas&logoColor=white)
-
-![Matplotlib](https://img.shields.io/badge/Matplotlib-3.8%2B-informational?logo=python&logoColor=white)
-
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Neon_Serverless-336791?logo=postgresql&logoColor=white)
-
 ![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-ORM%2FCore-D71F00?logo=sqlalchemy&logoColor=white)
-
-![Streamlit](https://img.shields.io/badge/Streamlit-Dashboard-FF4B4B?logo=streamlit&logoColor=white)
-
+![Streamlit](https://img.shields.io/badge/Streamlit-Community_Cloud-FF4B4B?logo=streamlit&logoColor=white)
+![Plotly](https://img.shields.io/badge/Plotly-Express-3F4F75?logo=plotly&logoColor=white)
+![Matplotlib](https://img.shields.io/badge/Matplotlib-3.8%2B-informational?logo=python&logoColor=white)
 ![Seaborn](https://img.shields.io/badge/Seaborn-0.13%2B-blueviolet)
-
 ![Git](https://img.shields.io/badge/Git-VCS-F05032?logo=git&logoColor=white)
-
 ![Status](https://img.shields.io/badge/Status-Concluído-success)
-
 ![License](https://img.shields.io/badge/Licença-MIT-green)
 
-
-
-Solução modular e automatizada de **Engenharia e Análise de Dados** ponta a ponta desenvolvida em **Python** e **Pandas**, com suporte a **Matplotlib** e **Seaborn** para visualização executiva e **Git** para versionamento, persistência relacional no **PostgreSQL** **Neon** com **SQLAlchemy**, orquestração completa do pipeline, dashboard interativo em **Streamlit** e versionamento com Git. O sistema realiza data profiling, higienização, mapeamento para schema canônico, carga em **Star Schema**, cálculo de indicadores financeiros e detecção de rupturas de estoque a partir de fontes de múltiplos fornecedores.
+Solução modular e automatizada de **Engenharia e Análise de Dados** ponta a ponta desenvolvida em **Python** e **Pandas**, com persistência relacional no **Neon PostgreSQL (Cloud)** com **SQLAlchemy**, orquestração completa do pipeline de ETL, geração de relatórios executivos e disponibilização de um dashboard interativo em tempo real hospedado no **Streamlit Community Cloud**. O sistema realiza data profiling, higienização, mapeamento para schema canônico, carga em **Star Schema**, cálculo de indicadores financeiros e detecção de rupturas de estoque a partir de fontes de múltiplos fornecedores.
 
 
 
@@ -65,46 +58,46 @@ Neste projeto, três fornecedores distintos (**Fornecedor A, Fornecedor B e Forn
 
 
 
-O pipeline segue um fluxo lógico desacoplado e modular:
-
-
+O pipeline segue um fluxo lógico desacoplado e modular com arquitetura ponta a ponta conectada à nuvem:
 
 ```text
-
 [dados_brutos/] (Fontes Despadronizadas)
-
        │
-
        ▼
-
 [exploracao_diagnostico.py] (Profiling: dtypes, nulos, cabeçalhos)
-
        │
-
        ▼
-
 [limpeza_padronizacao.py] (ETL: Schema Canônico, Regex, Coerção, Dedução)
-
        │
-
        ▼
-
 [dados_processados/estoque_consolidado_limpo.csv] (Base Canônica SSOT)
-
-       ├──▶ [analise_negocio.py] ──▶ [dados_processados/resumo_kpis_categoria.csv]
-
        │
-
-       └──▶ [visualizacao_graficos.py] ──▶ [graficos/*.png] (Gráficos Executivos 300 DPI)
-
+       ├──▶ [analise_negocio.py] ──▶ [dados_processados/resumo_kpis_categoria.csv]
+       │
+       ├──▶ [visualizacao_graficos.py] ──▶ [graficos/*.png] (Gráficos Executivos 300 DPI)
+       │
+       └──▶ [carregar_dados.py] ──▶ [Neon PostgreSQL (Cloud)]
+                                            │
+                                            ▼ (SQLAlchemy / Cache)
+                                  [Streamlit Community Cloud]
+                                  (estoque-dashboard-live.streamlit.app)
 ```
 
+### 🛠️ Tecnologias Utilizadas e Nuvem
 
+| Camada | Tecnologia | Finalidade no Projeto |
+| :--- | :--- | :--- |
+| **Linguagem & Manipulação** | Python 3.10+, Pandas | Engenharia de dados, profiling exploratório, pipeline de ETL e cálculo de KPIs |
+| **Banco de Dados (Cloud)** | **Neon PostgreSQL (Cloud)** | Data Warehouse relacional serverless em nuvem com modelagem dimensional (*Star Schema*) |
+| **Conectividade & ORM** | SQLAlchemy, psycopg2-binary | Gerenciamento de engine, pool de conexões e execução transacional segura |
+| **Dashboard & Visualização Interativa** | Streamlit, Plotly Express | Aplicação analítica com filtros dinâmicos, métricas executivas e gráficos interativos |
+| **Deploy & Hospedagem em Nuvem** | **Streamlit Community Cloud** | Hospedagem contínua, CI/CD integrado ao GitHub e disponibilização pública da aplicação |
+| **Visualização Executiva** | Matplotlib, Seaborn | Geração de gráficos estáticos em alta resolução (300 DPI) para relatórios |
+| **Configuração & Controle de Versão** | python-dotenv, Git, GitHub | Gestão segura de variáveis de ambiente (`.env`) e controle de versão do código |
 
 ### Estrutura do Diretório do Projeto:
 
 ```text
-
 pipeline-analise-estoque-python/
 │
 ├── dados_brutos/                          # Arquivos CSV brutos enviados pelos fornecedores
@@ -133,10 +126,10 @@ pipeline-analise-estoque-python/
 ├── pipeline_completo.py                   # Orquestrador mestre automatizado de ponta a ponta
 ├── app.py                                 # Painel interativo em tempo real via Streamlit
 │
-├── requirements.txt                       # Arquivo de dependências do ambiente
+├── requirements.txt                       # Dependências do ambiente Python
+├── .env                                   # Variáveis de ambiente e credenciais (DATABASE_URL)
 ├── .gitignore                             # Regras de exclusão do Git
 └── README.md                              # Documentação principal do projeto
-
 ```
 
 
@@ -261,151 +254,133 @@ Foram identificados **8 produtos com estoque zerado**, demandando reposição im
 
 
 
-## 📈 Visualização Gráfica
+## 📈 Demonstração e Visualização
 
-
-
-Gráficos executivos renderizados a **300 DPI** com `matplotlib` e `seaborn`, utilizando paleta profissional e formatação em moeda nacional:
-
-
-
-### 1. Valor Financeiro por Categoria
-
-![Valor por Categoria](graficos/valor_por_categoria.png)
-
-
-
-### 2. Comparativo de Fornecedores (Volume Físico vs. SKUs Ativos)
-
-![Comparativo de Fornecedores](graficos/distribuicao_estoque_fornecedor.png)
-
-
-
-### 3. Alerta de Ruptura de Estoque (Produtos Zerados por Ticket)
-
-![Alerta de Ruptura](graficos/alerta_ruptura_estoque.png)
-
-
+A camada de visualização do projeto é composta por duas frentes complementares: um **dashboard interativo em nuvem** para tomada de decisão em tempo real e um conjunto de **gráficos executivos estáticos** para relatórios e apresentações gerenciais.
 
 ---
 
+### 1. 🖥️ Dashboard Interativo em Produção (Streamlit Community Cloud)
 
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://estoque-dashboard-live.streamlit.app)
+
+> 🌐 **Acesso Online:** [estoque-dashboard-live.streamlit.app](https://estoque-dashboard-live.streamlit.app)
+
+A aplicação web interativa foi implantada em produção no **Streamlit Community Cloud** e consome as métricas e tabelas consolidadas diretamente da instância em nuvem do **Neon PostgreSQL (Cloud)** através do **SQLAlchemy**:
+
+* **Integração em Nuvem com SQLAlchemy:** O painel estabelece conexão gerenciada com o banco Neon via `create_engine` e gerencia o ciclo de vida da conexão através do decorador `@st.cache_resource`.
+* **Consultas Analíticas Otimizadas:** As métricas são consultadas na tabela fato (`core.fato_estoque`) com junção nas dimensões de produtos (`core.dim_produtos`) e categorias (`core.dim_categorias`), utilizando a sintaxe `DISTINCT ON (p.sku)` ordenada pela carga mais recente (`data_carga DESC`).
+* **Cache Inteligente de Baixa Latência:** O carregamento dos dados utiliza `@st.cache_data(ttl=60)`, assegurando tempo de resposta instantâneo aos usuários simultâneos sem sobrecarregar a infraestrutura do banco.
+* **Recursos do Painel:**
+  * **Barra Lateral com Filtros Dinâmicos:** Filtro reativo por categoria de produto (*Todas*, *Smartphones*, *Fones de Ouvido*, *Carregadores*).
+  * **Scorecards de KPIs em Tempo Real:** Total de SKUs cadastrados, volume físico de itens, preço médio global, capital total imobilizado e contagem de itens em ruptura de estoque.
+  * **Gráficos Interativos (Plotly Express):** Gráfico de barras de valor retido por categoria e gráfico de pizza/rosca detalhando a proporção de produtos com *Estoque Regular* vs. *Reposição Necessária*.
+  * **Tabela Analítica Completa:** Visualização detalhada dos itens filtrados com badges visuais de status, formatação monetária em padrão brasileiro (R$) e ordenação dinâmica por valor imobilizado.
+
+---
+
+### 2. 📊 Relatórios Gráficos Executivos (300 DPI)
+
+Gráficos executivos gerados via `matplotlib` e `seaborn`, utilizando paleta profissional e formatação em moeda nacional:
+
+#### 1. Valor Financeiro por Categoria
+![Valor por Categoria](graficos/valor_por_categoria.png)
+
+#### 2. Comparativo de Fornecedores (Volume Físico vs. SKUs Ativos)
+![Comparativo de Fornecedores](graficos/distribuicao_estoque_fornecedor.png)
+
+#### 3. Alerta de Ruptura de Estoque (Produtos Zerados por Ticket)
+![Alerta de Ruptura](graficos/alerta_ruptura_estoque.png)
+
+---
 
 ## 🚀 Instruções de Execução
 
-
-
-Siga o passo a passo abaixo para clonar, configurar e executar todos os estágios do pipeline:
-
-
+Siga o passo a passo abaixo para clonar, configurar e executar todos os estágios do pipeline e o dashboard localmente:
 
 ### 1. Clonar o Repositório
 
 ```bash
-
 git clone https://github.com/paulocid95/pipeline-analise-estoque-python.git
-
 cd pipeline-analise-estoque-python
-
 ```
-
-
 
 ### 2. Configurar o Ambiente Virtual
 
 * **No Windows (PowerShell):**
-
   ```powershell
-
   python -m venv .venv
-
   .venv\Scripts\Activate.ps1
-
   ```
 
 * **No Linux / macOS:**
-
   ```bash
-
   python3 -m venv .venv
-
   source .venv/bin/activate
-
   ```
-
-
 
 ### 3. Instalar Dependências
 
 ```bash
-
 pip install -r requirements.txt
-
 ```
 
+### 4. Configurar as Variáveis de Ambiente (`.env`)
 
+Crie um arquivo `.env` na raiz do projeto contendo a string de conexão do PostgreSQL Neon:
 
-### 4. Executar os Scripts na Ordem Correta
+```env
+DATABASE_URL="postgresql://<usuario>:<senha>@<host>/<database>?sslmode=require"
+```
 
+> **Nota:** Esta variável é consumida automaticamente pelos scripts de migração DDL (`criar_tabelas.py`), carga (`carregar_dados.py`), auditoria (`consultar_banco.py`) e pelo dashboard Streamlit (`app.py`).
 
+### 5. Executar os Scripts na Ordem Correta
 
-Execute os scripts sequencialmente para replicar a esteira completa:
-
-
+Para processar os dados locais e sincronizar com o banco relacional, execute:
 
 ```bash
-
 # 1. Simular e criar os dados brutos com inconsistências (pasta dados_brutos/)
-
 python gerar_dados_brutos.py
 
-
-
 # 2. Executar o diagnóstico exploratório de dados e profiling de inconsistências
-
 python exploracao_diagnostico.py
 
-
-
 # 3. Executar o pipeline de limpeza, padronização e consolidação (salva em dados_processados/)
-
 python limpeza_padronizacao.py
 
-
-
 # 4. Calcular métricas financeiras de negócio, alertas de ruptura e exportar KPIs
-
 python analise_negocio.py
 
-
-
 # 5. Gerar e salvar os gráficos executivos em alta resolução (pasta graficos/)
-
 python visualizacao_graficos.py
-
-
 
 # 6. Provisionar o schema relacional e as tabelas com constraints no PostgreSQL
 python criar_tabelas.py
 
-
-
 # 7. Executar a ingestão dimensional com lógica de Upsert no banco de dados
 python carregar_dados.py
 
-
-
 # 8. Executar validações e consultas analíticas de auditoria
 python consultar_banco.py
-
 ```
 
+> 💡 **Execução Automatizada:** Você também pode rodar toda a esteira de uma única vez com o orquestrador unificado:
+> ```bash
+> python pipeline_completo.py
+> ```
 
+### 6. Iniciar o Dashboard Interativo Localmente
 
-### 5. Iniciar o Dashboard Interativo
-Para visualizar as métricas, filtros dinâmicos e gráficos interativos no navegador:
+Para rodar o painel analítico localmente consumindo a base do Neon:
+
 ```powershell
 streamlit run app.py
+```
+
+A aplicação será aberta automaticamente em seu navegador padrão no endereço `http://localhost:8501`.
+
+> 🚀 **Prefere testar sem instalar nada?** Acesse a versão já implantada em produção no [Streamlit Community Cloud](https://estoque-dashboard-live.streamlit.app).
 
 
 
