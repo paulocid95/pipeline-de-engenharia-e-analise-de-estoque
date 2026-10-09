@@ -270,7 +270,7 @@ with tab_visao_geral:
                 "prioridade": st.column_config.TextColumn("Prioridade"),
                 "nome_produto": st.column_config.TextColumn("Produto"),
                 "nome_categoria": st.column_config.TextColumn("Categoria"),
-                "fornecedor": st.column_config.TextColumn("Fornecedor"),
+                "fornecedor": st.column_config.TextColumn("Fornecedor de Origem"),
                 "preco_unitario": st.column_config.NumberColumn(
                     "Preço Unitário",
                     format="R$ %.2f",
