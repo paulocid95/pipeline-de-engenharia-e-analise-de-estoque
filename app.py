@@ -170,6 +170,7 @@ with tab_visao_geral:
 
             total_cat = df_cat["valor_total"].sum()
             df_cat["pct"] = (df_cat["valor_total"] / total_cat) * 100
+            max_valor_cat = df_cat["valor_total"].max()
 
             # Destaque focal em Smartphones (ou na categoria de maior representatividade)
             cores_barras = [
@@ -184,14 +185,15 @@ with tab_visao_geral:
                 orientation="h",
                 marker=dict(color=cores_barras, line=dict(color="#0f172a", width=0.8)),
                 text=[f"{formatar_moeda_brl(v)} ({p:.1f}%)" for v, p in zip(df_cat["valor_total"], df_cat["pct"])],
-                textposition="outside",
+                textposition="auto",
                 hovertemplate="<b>%{y}</b><br>Capital Retido: R$ %{x:,.2f}<br>Participação: %{text}<extra></extra>",
             ))
+            fig_cat.update_traces(cliponaxis=False)
 
             fig_cat.update_layout(
                 xaxis_title="Montante Retido (R$)",
                 yaxis_title="Categoria",
-                xaxis=dict(showgrid=True, gridcolor="#e2e8f0"),
+                xaxis=dict(showgrid=True, gridcolor="#e2e8f0", range=[0, max_valor_cat * 1.35]),
                 plot_bgcolor="#ffffff",
                 paper_bgcolor="#ffffff",
                 height=380,
@@ -239,43 +241,44 @@ with tab_visao_geral:
         else:
             st.info("ℹ️ Nenhum dado disponível para os filtros selecionados.")
 
-    # 1.3 Alerta de Ruptura de Estoque (Ranking Interativo de Itens Zerados)
-    st.subheader("🚨 Alerta de Ruptura de Estoque (Produtos Zerados por Ticket)")
+    # 1.3 Alerta de Ruptura de Estoque (Matriz de Recompra Prioritária)
+    st.subheader("🚨 Alerta de Ruptura de Estoque: Matriz de Recompra Prioritária")
+    st.caption("Classificação executiva de SKUs zerados por impacto financeiro unitário para direcionar o orçamento de reposição imediata.")
     df_ruptura = df_filtrado[df_filtrado["quantidade_disponivel"] == 0].copy()
 
     if not df_ruptura.empty:
-        df_ruptura = df_ruptura.sort_values(by="preco_unitario", ascending=True)
+        # Ordenação estrita do maior para o menor Preço Unitário
+        df_ruptura = df_ruptura.sort_values(by="preco_unitario", ascending=False)
 
-        fig_rup = go.Figure()
-        fig_rup.add_trace(go.Bar(
-            y=df_ruptura["nome_produto"],
-            x=df_ruptura["preco_unitario"],
-            orientation="h",
-            marker=dict(
-                color=df_ruptura["preco_unitario"],
-                colorscale="YlOrRd",
-                line=dict(color="#7f1d1d", width=0.8),
-            ),
-            text=[f"{formatar_moeda_brl(p)}  •  {c}" for p, c in zip(df_ruptura["preco_unitario"], df_ruptura["nome_categoria"])],
-            textposition="outside",
-            customdata=df_ruptura[["fornecedor", "nome_categoria", "sku"]].values,
-            hovertemplate="<b>%{y}</b> (SKU: %{customdata[2]})<br>" +
-                          "Fornecedor: <b>%{customdata[0]}</b><br>" +
-                          "Categoria: <b>%{customdata[1]}</b><br>" +
-                          "Preço Unitário: <b>R$ %{x:,.2f}</b><br>" +
-                          "Estoque Atual: <b>0 un</b><extra></extra>",
-        ))
+        def classificar_prioridade(preco: float) -> str:
+            if preco >= 1000.0:
+                return "🔴 ALTA PRIORIDADE"
+            elif preco >= 200.0:
+                return "🟡 MÉDIA PRIORIDADE"
+            else:
+                return "🔵 BAIXA PRIORIDADE"
 
-        fig_rup.update_layout(
-            xaxis_title="Preço Unitário / Potencial de Faturamento Unitário (R$)",
-            yaxis_title="Produto em Ruptura",
-            xaxis=dict(showgrid=True, gridcolor="#e2e8f0"),
-            plot_bgcolor="#ffffff",
-            paper_bgcolor="#ffffff",
-            height=max(360, len(df_ruptura) * 45),
-            margin=dict(l=10, r=160, t=20, b=40),
+        df_ruptura["prioridade"] = df_ruptura["preco_unitario"].apply(classificar_prioridade)
+
+        df_ruptura_exibicao = df_ruptura[[
+            "prioridade", "nome_produto", "nome_categoria", "fornecedor", "preco_unitario"
+        ]].copy()
+
+        st.dataframe(
+            df_ruptura_exibicao,
+            column_config={
+                "prioridade": st.column_config.TextColumn("Prioridade"),
+                "nome_produto": st.column_config.TextColumn("Produto"),
+                "nome_categoria": st.column_config.TextColumn("Categoria"),
+                "fornecedor": st.column_config.TextColumn("Fornecedor"),
+                "preco_unitario": st.column_config.NumberColumn(
+                    "Preço Unitário",
+                    format="R$ %.2f",
+                ),
+            },
+            hide_index=True,
+            use_container_width=True,
         )
-        st.plotly_chart(fig_rup, use_container_width=True)
     else:
         st.success("✅ **Nenhum produto zerado ou em ruptura crítica** para o conjunto de filtros aplicado.")
 
