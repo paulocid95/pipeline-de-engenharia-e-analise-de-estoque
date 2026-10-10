@@ -19,6 +19,75 @@ st.set_page_config(
 )
 
 # ==============================================================================
+# ESTILIZAÇÃO CSS CUSTOMIZADA (SaaS MODERNO & CARDS EXECUTIVOS)
+# ==============================================================================
+st.markdown("""
+<style>
+    /* Tipografia e títulos estilo SaaS */
+    h1 {
+        font-weight: 800 !important;
+        letter-spacing: -0.025em !important;
+        color: #0f172a !important;
+    }
+    h2, h3 {
+        font-weight: 700 !important;
+        letter-spacing: -0.015em !important;
+        color: #1e293b !important;
+    }
+
+    /* Cards de métricas modernos */
+    div[data-testid="stMetric"] {
+        background-color: #ffffff;
+        border: 1px solid #E2E8F0;
+        border-radius: 12px;
+        padding: 16px 20px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+        transition: all 0.2s ease;
+    }
+    div[data-testid="stMetric"]:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04);
+        border-color: #cbd5e1;
+    }
+    div[data-testid="stMetric"] label {
+        font-weight: 600;
+        color: #64748b !important;
+        font-size: 0.86rem !important;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+    div[data-testid="stMetric"] [data-testid="stMetricValue"] {
+        font-weight: 750;
+        color: #0f172a !important;
+        font-size: 1.6rem !important;
+    }
+
+    /* Banners contextuais de introdução de abas */
+    .tab-banner {
+        background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+        border-left: 4px solid #2563eb;
+        border-radius: 8px;
+        padding: 12px 18px;
+        margin-bottom: 22px;
+        color: #334155;
+        font-size: 0.94rem;
+        line-height: 1.5;
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04);
+    }
+    .tab-banner strong {
+        color: #0f172a;
+    }
+
+    /* Abas estilizadas */
+    button[data-baseweb="tab"] {
+        font-size: 0.98rem;
+        font-weight: 600;
+        padding: 10px 18px;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# ==============================================================================
 # 2. CONEXÃO COM O BANCO DE DADOS (POSTGRESQL / NEON)
 # ==============================================================================
 load_dotenv()
@@ -202,6 +271,10 @@ tab_visao_geral, tab_fornecedores, tab_compras, tab_tabela = st.tabs([
 # ABA 1: VISÃO GERAL & RUPTURA
 # ------------------------------------------------------------------------------
 with tab_visao_geral:
+    st.markdown(
+        '<div class="tab-banner">🎯 <strong>Cenário Operacional:</strong> Diagnóstico da saúde do estoque e identificação imediata de SKUs zerados para priorização de recompra e mitigação de perda de receita.</div>',
+        unsafe_allow_html=True,
+    )
     col_graf1, col_graf2 = st.columns(2)
 
     # 1.1 Capital Imobilizado por Categoria (Barras Horizontais com Paleta Semântica)
@@ -332,6 +405,10 @@ with tab_visao_geral:
 # ABA 2: ANÁLISE DE FORNECEDORES
 # ------------------------------------------------------------------------------
 with tab_fornecedores:
+    st.markdown(
+        '<div class="tab-banner">🏭 <strong>Cenário de Parcerias:</strong> Análise da concentração de compras, dependência de fornecedores e distribuição de volume físico por parceiro comercial.</div>',
+        unsafe_allow_html=True,
+    )
     st.subheader("🏭 Desempenho e Distribuição por Fornecedor")
 
     df_forn = df_filtrado.groupby("fornecedor", as_index=False).agg(
@@ -434,6 +511,10 @@ with tab_fornecedores:
 # ABA 3: INTELIGÊNCIA DE COMPRAS & COTAÇÕES (PROCUREMENT ANALYTICS)
 # ------------------------------------------------------------------------------
 with tab_compras:
+    st.markdown(
+        '<div class="tab-banner">💡 <strong>Cenário de Procurement:</strong> Auditoria de propostas concorrentes, identificação de saving potencial e otimização da relação custo vs. prazo de entrega.</div>',
+        unsafe_allow_html=True,
+    )
     st.subheader("💡 Inteligência de Compras e Cotações (Procurement Analytics)")
     st.caption("Central estratégica de negociação: simulação de cenários de recompra, concorrência direta e captura de saving unitário.")
 
@@ -480,7 +561,30 @@ with tab_compras:
 
         st.markdown("<br>", unsafe_allow_html=True)
 
-        # 2. Simulador de Recompra para Ruptura / Alerta
+        # 2. Módulo de Cotações Brutas (Expander de Auditoria)
+        with st.expander("📥 Ver Todas as Propostas em Aberto (Cotações Recebidas)", expanded=False):
+            st.caption(f"Visão analítica completa das {len(df_cot_filtrado)} propostas comerciais submetidas pelos parceiros para auditoria de preços.")
+            df_cot_brutas = df_cot_filtrado[[
+                "sku", "nome_produto", "fornecedor_cotacao", "preco_cotado", "lote_minimo", "prazo_dias", "data_cotacao"
+            ]].copy()
+            st.dataframe(
+                df_cot_brutas,
+                column_config={
+                    "sku": st.column_config.TextColumn("SKU"),
+                    "nome_produto": st.column_config.TextColumn("Produto"),
+                    "fornecedor_cotacao": st.column_config.TextColumn("Fornecedor"),
+                    "preco_cotado": st.column_config.NumberColumn("Preço Cotado", format="R$ %.2f"),
+                    "lote_minimo": st.column_config.NumberColumn("Lote Mínimo", format="%d un"),
+                    "prazo_dias": st.column_config.NumberColumn("Prazo de Entrega", format="%d dias"),
+                    "data_cotacao": st.column_config.DatetimeColumn("Data Cotação", format="DD/MM/YYYY HH:mm"),
+                },
+                hide_index=True,
+                use_container_width=True,
+            )
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        # 3. Simulador de Recompra para Ruptura / Alerta
         st.markdown("##### 🚨 Simulador de Recompra: Melhor Oferta para Itens em Ruptura ou Alerta")
         st.caption("Identificação automática do fornecedor mais vantajoso para os itens que demandam reposição operacional imediata.")
 
@@ -519,9 +623,23 @@ with tab_compras:
 
         st.markdown("<br>", unsafe_allow_html=True)
 
-        # 3. Análise Gráfica de Trade-off (Plotly Scatter Plot)
-        st.markdown("##### ⚖️ Trade-off Custo vs. Agilidade Logística")
-        st.caption("Dispersão comparativa entre Prazo de Entrega (dias) e Preço Cotado (R$), com tamanho proporcional ao Lote Mínimo.")
+        # 4. Análise Gráfica Redesenhada de Trade-off (Plotly Scatter Plot Intuitivo)
+        col_t1, col_t2 = st.columns([2, 1])
+        with col_t1:
+            st.markdown("##### ⚖️ Matriz de Trade-off: Custo Unitário vs. Agilidade Logística")
+            st.caption("Avaliação de equilíbrio entre preço negociado e tempo de atendimento para guiar compras inteligentes.")
+            st.caption("💡 **Como interpretar:** Pontos no **canto inferior esquerdo** representam o cenário ideal (menor preço e entrega mais ágil). Pontos no **canto superior direito** indicam condições desfavoráveis (maior custo e maior prazo).")
+        with col_t2:
+            categorias_tradeoff = ["Todas as Categorias"] + sorted(df_cot_filtrado["nome_categoria"].dropna().unique().tolist())
+            cat_tradeoff_selecionada = st.selectbox(
+                "Filtrar Categoria no Gráfico:",
+                categorias_tradeoff,
+                key="sel_cat_tradeoff",
+            )
+
+        df_graf_tradeoff = df_cot_filtrado.copy()
+        if cat_tradeoff_selecionada != "Todas as Categorias":
+            df_graf_tradeoff = df_graf_tradeoff[df_graf_tradeoff["nome_categoria"] == cat_tradeoff_selecionada]
 
         paleta_fornecedores = {
             "Fornecedor A": "#2563eb",  # Azul Royal
@@ -530,43 +648,62 @@ with tab_compras:
         }
 
         fig_tradeoff = px.scatter(
-            df_cot_filtrado,
+            df_graf_tradeoff,
             x="prazo_dias",
             y="preco_cotado",
             color="fornecedor_cotacao",
             size="lote_minimo",
-            hover_name="nome_produto",
             color_discrete_map=paleta_fornecedores,
             labels={
                 "prazo_dias": "Prazo de Entrega (Dias Úteis)",
                 "preco_cotado": "Preço Cotado (R$)",
                 "fornecedor_cotacao": "Fornecedor",
-                "lote_minimo": "Lote Mínimo",
+                "lote_minimo": "Lote Mínimo (unidades)",
             },
-            hover_data={
-                "sku": True,
-                "nome_categoria": True,
-                "preco_referencia": ":.2f",
-                "preco_cotado": ":.2f",
-                "lote_minimo": True,
-                "prazo_dias": True,
-            },
+            custom_data=["nome_produto", "sku", "nome_categoria", "fornecedor_cotacao", "lote_minimo"],
         )
+
+        fig_tradeoff.update_traces(
+            hovertemplate=(
+                "<b>Produto:</b> %{customdata[0]}<br>"
+                "<b>SKU:</b> %{customdata[1]} | <b>Categoria:</b> %{customdata[2]}<br>"
+                "<b>Fornecedor:</b> %{customdata[3]}<br>"
+                "<b>Preço:</b> R$ %{y:,.2f}<br>"
+                "<b>Prazo:</b> %{x} dias úteis<br>"
+                "<b>Lote Mínimo:</b> %{customdata[4]} un<extra></extra>"
+            )
+        )
+
+        # Configuração de layout com margens e respiro visual para as bolhas
+        min_prazo = float(df_graf_tradeoff["prazo_dias"].min()) if not df_graf_tradeoff.empty else 0
+        max_prazo = float(df_graf_tradeoff["prazo_dias"].max()) if not df_graf_tradeoff.empty else 15
+        min_preco = float(df_graf_tradeoff["preco_cotado"].min()) if not df_graf_tradeoff.empty else 0
+        max_preco = float(df_graf_tradeoff["preco_cotado"].max()) if not df_graf_tradeoff.empty else 1000
 
         fig_tradeoff.update_layout(
             plot_bgcolor="#ffffff",
             paper_bgcolor="#ffffff",
-            height=460,
-            margin=dict(l=20, r=20, t=20, b=40),
+            height=480,
+            margin=dict(t=30, b=40, l=40, r=40),
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
         )
-        fig_tradeoff.update_xaxes(showgrid=True, gridcolor="#e2e8f0")
-        fig_tradeoff.update_yaxes(showgrid=True, gridcolor="#e2e8f0")
+        fig_tradeoff.update_xaxes(
+            showgrid=True,
+            gridcolor="#e2e8f0",
+            title_text="Prazo de Entrega (Dias Úteis)",
+            range=[max(0, min_prazo - 1.5), max_prazo + 1.5],
+        )
+        fig_tradeoff.update_yaxes(
+            showgrid=True,
+            gridcolor="#e2e8f0",
+            title_text="Preço Cotado (R$)",
+            range=[max(0, min_preco * 0.90), max_preco * 1.08],
+        )
         st.plotly_chart(fig_tradeoff, use_container_width=True)
 
         st.markdown("<br>", unsafe_allow_html=True)
 
-        # 4. Comparador Detalhado por SKU
+        # 5. Comparador Detalhado por SKU
         st.markdown("##### 🔍 Comparador Concorrencial por Produto")
         st.caption("Selecione um produto para auditar e comparar todas as propostas ativas submetidas pelos parceiros.")
 
@@ -627,6 +764,10 @@ with tab_compras:
 # ABA 4: TABELA OPERACIONAL & EXPORTAÇÃO
 # ------------------------------------------------------------------------------
 with tab_tabela:
+    st.markdown(
+        '<div class="tab-banner">📋 <strong>Cenário Tático & Auditoria:</strong> Consulta detalhada de todos os itens cadastrados com filtros flexíveis e extração em formato CSV para rotinas operacionais.</div>',
+        unsafe_allow_html=True,
+    )
     st.subheader("📋 Tabela Operacional e Extração de Dados")
     st.markdown("Visualização analítica linha a linha dos produtos cadastrados com opções de ordenação e exportação de relatório.")
 
