@@ -75,7 +75,42 @@ def carregar_dados_analiticos() -> pd.DataFrame:
     return df_raw.sort_values(by="valor_total_estoque", ascending=False)
 
 
+@st.cache_data(ttl=60)
+def carregar_dados_cotacoes() -> pd.DataFrame:
+    """Consulta analítica de cotações concorrentes unida às dimensões e status atual."""
+    query = """
+        SELECT
+            c.id_cotacao,
+            p.sku,
+            p.nome_produto,
+            cat.nome_categoria,
+            p.preco_unitario AS preco_referencia,
+            c.fornecedor AS fornecedor_cotacao,
+            c.preco_cotado,
+            c.lote_minimo,
+            c.prazo_dias,
+            c.data_cotacao,
+            f.status_reposicao,
+            f.quantidade_disponivel
+        FROM core.fato_cotacoes c
+        JOIN core.dim_produtos p ON c.id_produto = p.id_produto
+        LEFT JOIN core.dim_categorias cat ON p.id_categoria = cat.id_categoria
+        LEFT JOIN (
+            SELECT DISTINCT ON (id_produto)
+                id_produto,
+                status_reposicao,
+                quantidade_disponivel,
+                data_carga
+            FROM core.fato_estoque
+            ORDER BY id_produto, data_carga DESC
+        ) f ON p.id_produto = f.id_produto
+        ORDER BY p.sku, c.preco_cotado ASC;
+    """
+    return pd.read_sql(text(query), engine)
+
+
 df = carregar_dados_analiticos()
+df_cot = carregar_dados_cotacoes()
 
 
 # ==============================================================================
@@ -103,7 +138,7 @@ fornecedor_selecionado = st.sidebar.selectbox("Filtrar por Fornecedor:", fornece
 status_disponiveis = ["Todos"] + sorted(df["status_reposicao"].dropna().unique().tolist())
 status_selecionado = st.sidebar.selectbox("Filtrar por Status de Reposição:", status_disponiveis)
 
-# Aplicação dos filtros
+# Aplicação dos filtros em Estoque
 df_filtrado = df.copy()
 if categoria_selecionada != "Todas":
     df_filtrado = df_filtrado[df_filtrado["nome_categoria"] == categoria_selecionada]
@@ -111,6 +146,15 @@ if fornecedor_selecionado != "Todos":
     df_filtrado = df_filtrado[df_filtrado["fornecedor"] == fornecedor_selecionado]
 if status_selecionado != "Todos":
     df_filtrado = df_filtrado[df_filtrado["status_reposicao"] == status_selecionado]
+
+# Aplicação dos filtros em Cotações
+df_cot_filtrado = df_cot.copy()
+if categoria_selecionada != "Todas":
+    df_cot_filtrado = df_cot_filtrado[df_cot_filtrado["nome_categoria"] == categoria_selecionada]
+if fornecedor_selecionado != "Todos":
+    df_cot_filtrado = df_cot_filtrado[df_cot_filtrado["fornecedor_cotacao"] == fornecedor_selecionado]
+if status_selecionado != "Todos":
+    df_cot_filtrado = df_cot_filtrado[df_cot_filtrado["status_reposicao"] == status_selecionado]
 
 # Rodapé da sidebar
 st.sidebar.divider()
@@ -146,9 +190,10 @@ st.divider()
 # ==============================================================================
 # 7. ESTRUTURA MODULAR EM ABAS (st.tabs)
 # ==============================================================================
-tab_visao_geral, tab_fornecedores, tab_tabela = st.tabs([
+tab_visao_geral, tab_fornecedores, tab_compras, tab_tabela = st.tabs([
     "📊 Visão Geral & Ruptura",
     "🏭 Análise de Fornecedores",
+    "💡 Inteligência de Compras",
     "📋 Tabela Operacional & Exportação",
 ])
 
@@ -386,7 +431,200 @@ with tab_fornecedores:
 
 
 # ------------------------------------------------------------------------------
-# ABA 3: TABELA OPERACIONAL & EXPORTAÇÃO
+# ABA 3: INTELIGÊNCIA DE COMPRAS & COTAÇÕES (PROCUREMENT ANALYTICS)
+# ------------------------------------------------------------------------------
+with tab_compras:
+    st.subheader("💡 Inteligência de Compras e Cotações (Procurement Analytics)")
+    st.caption("Central estratégica de negociação: simulação de cenários de recompra, concorrência direta e captura de saving unitário.")
+
+    if not df_cot_filtrado.empty:
+        # 1. Cards / Métricas no Topo
+        col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+
+        # Cálculo do Saving por SKU comparado à melhor proposta do mercado
+        idx_melhores = df_cot_filtrado.groupby("sku")["preco_cotado"].idxmin()
+        df_melhores_ofertas = df_cot_filtrado.loc[idx_melhores].copy()
+        df_melhores_ofertas["saving_unitario"] = df_melhores_ofertas["preco_referencia"] - df_melhores_ofertas["preco_cotado"]
+        df_melhores_ofertas["saving_pct"] = (df_melhores_ofertas["saving_unitario"] / df_melhores_ofertas["preco_referencia"]) * 100
+
+        saving_medio_pct = df_melhores_ofertas["saving_pct"].mean()
+        lead_time_medio = df_cot_filtrado["prazo_dias"].mean()
+
+        vitorias_fornecedor = df_melhores_ofertas["fornecedor_cotacao"].value_counts()
+        fornecedor_competitivo = vitorias_fornecedor.index[0] if not vitorias_fornecedor.empty else "N/A"
+        vitorias_qtd = int(vitorias_fornecedor.iloc[0]) if not vitorias_fornecedor.empty else 0
+        vitorias_pct = (vitorias_qtd / len(df_melhores_ofertas) * 100) if len(df_melhores_ofertas) > 0 else 0
+
+        col_m1.metric(
+            label="💰 Saving Potencial Médio",
+            value=f"{saving_medio_pct:.1f}%",
+            delta="Economia vs Tabela",
+            help="Economia percentual média obtida optando pela melhor proposta concorrente de cada SKU.",
+        )
+        col_m2.metric(
+            label="⏱️ Lead Time Médio",
+            value=f"{lead_time_medio:.1f} dias",
+            help="Prazo médio de entrega considerando todas as cotações ativas no filtro atual.",
+        )
+        col_m3.metric(
+            label="🏆 Fornecedor Mais Competitivo",
+            value=fornecedor_competitivo,
+            delta=f"{vitorias_qtd} ofertas vencedoras ({vitorias_pct:.0f}%)",
+            help="Fornecedor que apresentou o menor preço cotado no maior número de produtos.",
+        )
+        col_m4.metric(
+            label="📑 Cotações Analisadas",
+            value=f"{len(df_cot_filtrado)} propostas",
+            help=f"Volume de propostas cobrindo {len(df_melhores_ofertas)} SKUs cadastrados.",
+        )
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        # 2. Simulador de Recompra para Ruptura / Alerta
+        st.markdown("##### 🚨 Simulador de Recompra: Melhor Oferta para Itens em Ruptura ou Alerta")
+        st.caption("Identificação automática do fornecedor mais vantajoso para os itens que demandam reposição operacional imediata.")
+
+        df_reposicao_cot = df_melhores_ofertas[
+            df_melhores_ofertas["status_reposicao"].isin(["CRITICO", "ALERTA"])
+        ].copy()
+
+        if not df_reposicao_cot.empty:
+            df_reposicao_cot = df_reposicao_cot.sort_values(by="saving_unitario", ascending=False)
+            
+            df_reposicao_exibicao = df_reposicao_cot[[
+                "status_reposicao", "nome_produto", "nome_categoria", "preco_referencia",
+                "fornecedor_cotacao", "preco_cotado", "saving_unitario", "saving_pct",
+                "lote_minimo", "prazo_dias"
+            ]].copy()
+
+            st.dataframe(
+                df_reposicao_exibicao,
+                column_config={
+                    "status_reposicao": st.column_config.TextColumn("Status"),
+                    "nome_produto": st.column_config.TextColumn("Produto"),
+                    "nome_categoria": st.column_config.TextColumn("Categoria"),
+                    "preco_referencia": st.column_config.NumberColumn("Preço de Tabela", format="R$ %.2f"),
+                    "fornecedor_cotacao": st.column_config.TextColumn("Melhor Fornecedor"),
+                    "preco_cotado": st.column_config.NumberColumn("Preço Cotado", format="R$ %.2f"),
+                    "saving_unitario": st.column_config.NumberColumn("Saving Unitário", format="R$ %.2f"),
+                    "saving_pct": st.column_config.NumberColumn("Saving (%)", format="%.1f%%"),
+                    "lote_minimo": st.column_config.NumberColumn("Lote Mínimo", format="%d un"),
+                    "prazo_dias": st.column_config.NumberColumn("Prazo", format="%d dias"),
+                },
+                hide_index=True,
+                use_container_width=True,
+            )
+        else:
+            st.success("✅ **Nenhum produto em status CRÍTICO ou ALERTA** requer recompra urgente nos filtros atuais.")
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        # 3. Análise Gráfica de Trade-off (Plotly Scatter Plot)
+        st.markdown("##### ⚖️ Trade-off Custo vs. Agilidade Logística")
+        st.caption("Dispersão comparativa entre Prazo de Entrega (dias) e Preço Cotado (R$), com tamanho proporcional ao Lote Mínimo.")
+
+        paleta_fornecedores = {
+            "Fornecedor A": "#2563eb",  # Azul Royal
+            "Fornecedor B": "#0d9488",  # Verde-azulado / Teal
+            "Fornecedor C": "#f59e0b",  # Âmbar / Laranja
+        }
+
+        fig_tradeoff = px.scatter(
+            df_cot_filtrado,
+            x="prazo_dias",
+            y="preco_cotado",
+            color="fornecedor_cotacao",
+            size="lote_minimo",
+            hover_name="nome_produto",
+            color_discrete_map=paleta_fornecedores,
+            labels={
+                "prazo_dias": "Prazo de Entrega (Dias Úteis)",
+                "preco_cotado": "Preço Cotado (R$)",
+                "fornecedor_cotacao": "Fornecedor",
+                "lote_minimo": "Lote Mínimo",
+            },
+            hover_data={
+                "sku": True,
+                "nome_categoria": True,
+                "preco_referencia": ":.2f",
+                "preco_cotado": ":.2f",
+                "lote_minimo": True,
+                "prazo_dias": True,
+            },
+        )
+
+        fig_tradeoff.update_layout(
+            plot_bgcolor="#ffffff",
+            paper_bgcolor="#ffffff",
+            height=460,
+            margin=dict(l=20, r=20, t=20, b=40),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        )
+        fig_tradeoff.update_xaxes(showgrid=True, gridcolor="#e2e8f0")
+        fig_tradeoff.update_yaxes(showgrid=True, gridcolor="#e2e8f0")
+        st.plotly_chart(fig_tradeoff, use_container_width=True)
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        # 4. Comparador Detalhado por SKU
+        st.markdown("##### 🔍 Comparador Concorrencial por Produto")
+        st.caption("Selecione um produto para auditar e comparar todas as propostas ativas submetidas pelos parceiros.")
+
+        produtos_disponiveis = sorted(df_cot_filtrado["nome_produto"].unique().tolist())
+        produto_selecionado = st.selectbox(
+            "Selecione o Produto para Comparação Direta:",
+            options=produtos_disponiveis,
+            key="select_produto_cotacao",
+        )
+
+        df_sku_cot = df_cot_filtrado[df_cot_filtrado["nome_produto"] == produto_selecionado].sort_values(by="preco_cotado", ascending=True).copy()
+
+        if not df_sku_cot.empty:
+            preco_base_prod = float(df_sku_cot["preco_referencia"].iloc[0])
+            menor_oferta = float(df_sku_cot["preco_cotado"].min())
+            maior_oferta = float(df_sku_cot["preco_cotado"].max())
+            spread_oferta = maior_oferta - menor_oferta
+
+            col_p1, col_p2, col_p3, col_p4 = st.columns(4)
+            col_p1.metric("Preço de Tabela (Base)", formatar_moeda_brl(preco_base_prod))
+            col_p2.metric(
+                "Menor Oferta (Best Price)",
+                formatar_moeda_brl(menor_oferta),
+                delta=f"-{((preco_base_prod - menor_oferta)/preco_base_prod)*100:.1f}%" if preco_base_prod > 0 else None,
+            )
+            col_p3.metric("Maior Oferta", formatar_moeda_brl(maior_oferta))
+            col_p4.metric("Spread Concorrencial", formatar_moeda_brl(spread_oferta))
+
+            # Flag de classificação
+            df_sku_cot["resultado"] = [
+                "🏆 Vencedora (Melhor Preço)" if p == menor_oferta else "Concorrente"
+                for p in df_sku_cot["preco_cotado"]
+            ]
+            df_sku_cot["variacao_pct"] = ((df_sku_cot["preco_cotado"] - preco_base_prod) / preco_base_prod) * 100
+
+            st.dataframe(
+                df_sku_cot[[
+                    "resultado", "fornecedor_cotacao", "preco_cotado", "variacao_pct",
+                    "lote_minimo", "prazo_dias", "data_cotacao"
+                ]],
+                column_config={
+                    "resultado": st.column_config.TextColumn("Status da Oferta"),
+                    "fornecedor_cotacao": st.column_config.TextColumn("Fornecedor"),
+                    "preco_cotado": st.column_config.NumberColumn("Preço Cotado", format="R$ %.2f"),
+                    "variacao_pct": st.column_config.NumberColumn("Variação vs Tabela", format="%+.1f%%"),
+                    "lote_minimo": st.column_config.NumberColumn("Lote Mínimo", format="%d un"),
+                    "prazo_dias": st.column_config.NumberColumn("Prazo de Entrega", format="%d dias"),
+                    "data_cotacao": st.column_config.DatetimeColumn("Data da Cotação", format="DD/MM/YYYY HH:mm"),
+                },
+                hide_index=True,
+                use_container_width=True,
+            )
+    else:
+        st.info("ℹ️ Nenhuma cotação encontrada para os filtros selecionados.")
+
+
+# ------------------------------------------------------------------------------
+# ABA 4: TABELA OPERACIONAL & EXPORTAÇÃO
 # ------------------------------------------------------------------------------
 with tab_tabela:
     st.subheader("📋 Tabela Operacional e Extração de Dados")
