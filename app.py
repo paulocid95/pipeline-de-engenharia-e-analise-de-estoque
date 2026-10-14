@@ -97,14 +97,28 @@ try:
 except Exception:
     database_url = os.getenv("DATABASE_URL")
 
-if database_url and database_url.startswith("postgres://"):
-    database_url = database_url.replace("postgres://", "postgresql://", 1)
+
+def normalizar_url_banco(url: str) -> str:
+    """Normaliza o esquema da URL para compatibilidade garantida com drivers PostgreSQL no SQLAlchemy."""
+    if not url:
+        return ""
+    url = url.strip()
+    if url.startswith("postgres://"):
+        url = url.replace("postgres://", "postgresql+psycopg2://", 1)
+    elif url.startswith("postgresql://") and not url.startswith("postgresql+"):
+        url = url.replace("postgresql://", "postgresql+psycopg2://", 1)
+    return url
 
 
 @st.cache_resource
 def obter_conexao():
     """Cria e reutiliza o pool de conexões do SQLAlchemy com o banco de dados."""
-    return create_engine(database_url)
+    url_otimizada = normalizar_url_banco(database_url)
+    try:
+        return create_engine(url_otimizada)
+    except Exception:
+        # Fallback para a URL original se o driver explícito não responder
+        return create_engine(database_url)
 
 
 engine = obter_conexao()

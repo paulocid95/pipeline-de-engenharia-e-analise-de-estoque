@@ -5,5 +5,8 @@ matplotlib
 seaborn
 SQLAlchemy
 psycopg2-binary
+psycopg[binary]
+psycopg-binary
+psycopg
 python-dotenv
 google-genai
