@@ -7,6 +7,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from sqlalchemy import create_engine, text
 import streamlit as st
+from assistente_estoque import renderizar_interface_chat
 
 # ==============================================================================
 # 1. CONFIGURAÇÃO DA PÁGINA
@@ -91,7 +92,10 @@ st.markdown("""
 # 2. CONEXÃO COM O BANCO DE DADOS (POSTGRESQL / NEON)
 # ==============================================================================
 load_dotenv()
-database_url = os.getenv("DATABASE_URL")
+try:
+    database_url = st.secrets.get("DATABASE_URL", os.getenv("DATABASE_URL"))
+except Exception:
+    database_url = os.getenv("DATABASE_URL")
 
 if database_url and database_url.startswith("postgres://"):
     database_url = database_url.replace("postgres://", "postgresql://", 1)
@@ -259,11 +263,12 @@ st.divider()
 # ==============================================================================
 # 7. ESTRUTURA MODULAR EM ABAS (st.tabs)
 # ==============================================================================
-tab_visao_geral, tab_fornecedores, tab_compras, tab_tabela = st.tabs([
+tab_visao_geral, tab_fornecedores, tab_compras, tab_tabela, tab_assistente = st.tabs([
     "📊 Visão Geral & Ruptura",
     "🏭 Análise de Fornecedores",
     "💡 Inteligência de Compras",
     "📋 Tabela Operacional & Exportação",
+    "🤖 Assistente IA & Compras",
 ])
 
 
@@ -809,3 +814,10 @@ with tab_tabela:
         )
     with col_info:
         st.caption(f"📊 **Total de registros disponíveis para download:** {len(df_exibicao)} produtos filtrados.")
+
+
+# ------------------------------------------------------------------------------
+# ABA 5: ASSISTENTE DE IA & INTELIGÊNCIA DE COMPRAS
+# ------------------------------------------------------------------------------
+with tab_assistente:
+    renderizar_interface_chat(engine)

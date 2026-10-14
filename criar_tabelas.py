@@ -44,10 +44,24 @@ CREATE TABLE IF NOT EXISTS core.fato_estoque (
     status_reposicao VARCHAR(20) NOT NULL CHECK (status_reposicao IN ('NORMAL', 'ALERTA', 'CRITICO', 'EXCESSO'))
 );
 
+-- Tabela Fato: Cotações de Fornecedores (Procurement Analytics)
+CREATE TABLE IF NOT EXISTS core.fato_cotacoes (
+    id_cotacao SERIAL PRIMARY KEY,
+    id_produto INT NOT NULL REFERENCES core.dim_produtos(id_produto) ON DELETE CASCADE,
+    fornecedor VARCHAR(50) NOT NULL,
+    preco_cotado NUMERIC(10, 2) NOT NULL CHECK (preco_cotado >= 0),
+    lote_minimo INT NOT NULL DEFAULT 1 CHECK (lote_minimo >= 1),
+    prazo_dias INT NOT NULL DEFAULT 5 CHECK (prazo_dias >= 0),
+    data_cotacao TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Criação de índices estratégicos para acelerar consultas e filtros
 CREATE INDEX IF NOT EXISTS idx_fato_data_carga ON core.fato_estoque (data_carga DESC);
 CREATE INDEX IF NOT EXISTS idx_fato_status ON core.fato_estoque (status_reposicao);
 CREATE INDEX IF NOT EXISTS idx_produtos_sku ON core.dim_produtos (sku);
+CREATE INDEX IF NOT EXISTS idx_cotacoes_produto ON core.fato_cotacoes (id_produto);
+CREATE INDEX IF NOT EXISTS idx_cotacoes_fornecedor ON core.fato_cotacoes (fornecedor);
+CREATE INDEX IF NOT EXISTS idx_cotacoes_data ON core.fato_cotacoes (data_cotacao DESC);
 """
 
 def provisionar_banco():

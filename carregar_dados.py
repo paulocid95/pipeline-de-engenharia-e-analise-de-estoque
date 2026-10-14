@@ -80,17 +80,19 @@ def carregar_pipeline():
                 "nome": str(linha["produto"]).strip(),
                 "id_cat": mapa_categorias.get(nome_cat),
                 "preco": float(linha["preco"]),
+                "fornecedor": str(linha.get("fornecedor", "")).strip(),
             })
 
         if payload_produtos:
             conexao.execute(
                 text("""
-                    INSERT INTO core.dim_produtos (sku, nome_produto, id_categoria, preco_unitario, estoque_minimo)
-                    VALUES (:sku, :nome, :id_cat, :preco, 10)
+                    INSERT INTO core.dim_produtos (sku, nome_produto, id_categoria, preco_unitario, estoque_minimo, fornecedor)
+                    VALUES (:sku, :nome, :id_cat, :preco, 10, :fornecedor)
                     ON CONFLICT (sku) DO UPDATE SET
                         nome_produto = EXCLUDED.nome_produto,
                         id_categoria = EXCLUDED.id_categoria,
-                        preco_unitario = EXCLUDED.preco_unitario;
+                        preco_unitario = EXCLUDED.preco_unitario,
+                        fornecedor = EXCLUDED.fornecedor;
                 """),
                 payload_produtos,
             )
