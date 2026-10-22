@@ -642,83 +642,185 @@ with tab_compras:
 
         st.markdown("<br>", unsafe_allow_html=True)
 
-        # 4. Análise Gráfica Redesenhada de Trade-off (Plotly Scatter Plot Intuitivo)
+        # 4. Painel Executivo de Trade-off Logístico vs. Financeiro
         col_t1, col_t2 = st.columns([2, 1])
         with col_t1:
-            st.markdown("##### ⚖️ Matriz de Trade-off: Custo Unitário vs. Agilidade Logística")
-            st.caption("Avaliação de equilíbrio entre preço negociado e tempo de atendimento para guiar compras inteligentes.")
-            st.caption("💡 **Como interpretar:** Pontos no **canto inferior esquerdo** representam o cenário ideal (menor preço e entrega mais ágil). Pontos no **canto superior direito** indicam condições desfavoráveis (maior custo e maior prazo).")
+            st.markdown("##### ⚖️ Matriz Comparativa de Trade-off: Custo vs. Agilidade Logística")
+            st.caption("Comparativo consolidado por parceiro: contraste direto entre tempo de atendimento logístico e competitividade de preço negociado.")
         with col_t2:
             categorias_tradeoff = ["Todas as Categorias"] + sorted(df_cot_filtrado["nome_categoria"].dropna().unique().tolist())
             cat_tradeoff_selecionada = st.selectbox(
-                "Filtrar Categoria no Gráfico:",
+                "Filtrar Categoria na Análise:",
                 categorias_tradeoff,
                 key="sel_cat_tradeoff",
             )
 
-        df_graf_tradeoff = df_cot_filtrado.copy()
+        df_analise_tradeoff = df_cot_filtrado.copy()
         if cat_tradeoff_selecionada != "Todas as Categorias":
-            df_graf_tradeoff = df_graf_tradeoff[df_graf_tradeoff["nome_categoria"] == cat_tradeoff_selecionada]
+            df_analise_tradeoff = df_analise_tradeoff[df_analise_tradeoff["nome_categoria"] == cat_tradeoff_selecionada]
 
-        paleta_fornecedores = {
-            "Fornecedor A": "#2563eb",  # Azul Royal
-            "Fornecedor B": "#0d9488",  # Verde-azulado / Teal
-            "Fornecedor C": "#f59e0b",  # Âmbar / Laranja
-        }
+        if not df_analise_tradeoff.empty:
+            # Cálculo de saving individual por cotação frente à tabela de referência
+            df_analise_tradeoff["saving_pct_item"] = (
+                (df_analise_tradeoff["preco_referencia"] - df_analise_tradeoff["preco_cotado"]) 
+                / df_analise_tradeoff["preco_referencia"]
+            ) * 100
 
-        fig_tradeoff = px.scatter(
-            df_graf_tradeoff,
-            x="prazo_dias",
-            y="preco_cotado",
-            color="fornecedor_cotacao",
-            size="lote_minimo",
-            color_discrete_map=paleta_fornecedores,
-            labels={
-                "prazo_dias": "Prazo de Entrega (Dias Úteis)",
-                "preco_cotado": "Preço Cotado (R$)",
-                "fornecedor_cotacao": "Fornecedor",
-                "lote_minimo": "Lote Mínimo (unidades)",
-            },
-            custom_data=["nome_produto", "sku", "nome_categoria", "fornecedor_cotacao", "lote_minimo"],
-        )
+            resumo_fornecedores = df_analise_tradeoff.groupby("fornecedor_cotacao").agg(
+                prazo_medio=("prazo_dias", "mean"),
+                preco_medio=("preco_cotado", "mean"),
+                saving_medio=("saving_pct_item", "mean"),
+                lote_medio=("lote_minimo", "mean"),
+                total_itens=("id_cotacao", "count")
+            ).reset_index()
 
-        fig_tradeoff.update_traces(
-            hovertemplate=(
-                "<b>Produto:</b> %{customdata[0]}<br>"
-                "<b>SKU:</b> %{customdata[1]} | <b>Categoria:</b> %{customdata[2]}<br>"
-                "<b>Fornecedor:</b> %{customdata[3]}<br>"
-                "<b>Preço:</b> R$ %{y:,.2f}<br>"
-                "<b>Prazo:</b> %{x} dias úteis<br>"
-                "<b>Lote Mínimo:</b> %{customdata[4]} un<extra></extra>"
+            # Identificação de lideranças de trade-off
+            mais_agil = resumo_fornecedores.loc[resumo_fornecedores["prazo_medio"].idxmin()]
+            mais_economico = resumo_fornecedores.loc[resumo_fornecedores["saving_medio"].idxmax()]
+            menor_lote = resumo_fornecedores.loc[resumo_fornecedores["lote_medio"].idxmin()]
+
+            # 3 Cards de Síntese Executiva no Topo
+            kpi1, kpi2, kpi3 = st.columns(3)
+            kpi1.metric(
+                "⚡ Líder em Agilidade (Menor Prazo)",
+                f"{mais_agil['fornecedor_cotacao']}",
+                f"{mais_agil['prazo_medio']:.1f} dias médios",
+                delta_color="normal"
             )
-        )
+            kpi2.metric(
+                "💰 Líder em Custo (Maior Saving)",
+                f"{mais_economico['fornecedor_cotacao']}",
+                f"+{mais_economico['saving_medio']:.1f}% vs tabela",
+                delta_color="normal"
+            )
+            kpi3.metric(
+                "📦 Menor Compromisso de Compra",
+                f"{menor_lote['fornecedor_cotacao']}",
+                f"{menor_lote['lote_medio']:.0f} un / pedido",
+                delta_color="off"
+            )
 
-        # Configuração de layout com margens e respiro visual para as bolhas
-        min_prazo = float(df_graf_tradeoff["prazo_dias"].min()) if not df_graf_tradeoff.empty else 0
-        max_prazo = float(df_graf_tradeoff["prazo_dias"].max()) if not df_graf_tradeoff.empty else 15
-        min_preco = float(df_graf_tradeoff["preco_cotado"].min()) if not df_graf_tradeoff.empty else 0
-        max_preco = float(df_graf_tradeoff["preco_cotado"].max()) if not df_graf_tradeoff.empty else 1000
+            st.markdown("<br>", unsafe_allow_html=True)
 
-        fig_tradeoff.update_layout(
-            plot_bgcolor="#ffffff",
-            paper_bgcolor="#ffffff",
-            height=480,
-            margin=dict(t=30, b=40, l=40, r=40),
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        )
-        fig_tradeoff.update_xaxes(
-            showgrid=True,
-            gridcolor="#e2e8f0",
-            title_text="Prazo de Entrega (Dias Úteis)",
-            range=[max(0, min_prazo - 1.5), max_prazo + 1.5],
-        )
-        fig_tradeoff.update_yaxes(
-            showgrid=True,
-            gridcolor="#e2e8f0",
-            title_text="Preço Cotado (R$)",
-            range=[max(0, min_preco * 0.90), max_preco * 1.08],
-        )
-        st.plotly_chart(fig_tradeoff, use_container_width=True)
+            # Dois Gráficos de Barras Horizontais Límpidos (Zero Sobreposição)
+            col_g1, col_g2 = st.columns(2)
+
+            paleta_fornecedores = {
+                "Fornecedor A": "#2563eb",  # Azul Royal
+                "Fornecedor B": "#0d9488",  # Teal / Verde-azulado
+                "Fornecedor C": "#f59e0b",  # Âmbar / Laranja
+            }
+
+            with col_g1:
+                # Gráfico 1: Prazo Médio (quanto menor, mais ágil)
+                df_prazo = resumo_fornecedores.sort_values(by="prazo_medio", ascending=False)
+                fig_prazo = go.Figure(
+                    go.Bar(
+                        x=df_prazo["prazo_medio"],
+                        y=df_prazo["fornecedor_cotacao"],
+                        orientation="h",
+                        marker=dict(
+                            color=[paleta_fornecedores.get(f, "#64748b") for f in df_prazo["fornecedor_cotacao"]],
+                            line=dict(width=0),
+                        ),
+                        text=[f"<b>{p:.1f} dias úteis</b>" for p in df_prazo["prazo_medio"]],
+                        textposition="auto",
+                        textfont=dict(color="#ffffff", size=13),
+                        hovertemplate="<b>%{y}</b><br>Prazo Médio: %{x:.1f} dias úteis<extra></extra>",
+                    )
+                )
+                fig_prazo.update_layout(
+                    title=dict(text="<b>🚚 Agilidade Logística</b> (Prazo Médio de Entrega)", font=dict(size=14, color="#1e293b")),
+                    plot_bgcolor="#ffffff",
+                    paper_bgcolor="#ffffff",
+                    height=260,
+                    margin=dict(t=45, b=25, l=10, r=20),
+                    xaxis=dict(
+                        showgrid=True,
+                        gridcolor="#f1f5f9",
+                        title="Dias Úteis (menor barra = mais ágil)",
+                        zeroline=False,
+                    ),
+                    yaxis=dict(
+                        showgrid=False,
+                        tickfont=dict(size=12, color="#0f172a"),
+                    ),
+                )
+                st.plotly_chart(fig_prazo, use_container_width=True)
+
+            with col_g2:
+                # Gráfico 2: Saving Médio (% de Desconto frente à referência)
+                df_saving = resumo_fornecedores.sort_values(by="saving_medio", ascending=True)
+                fig_saving = go.Figure(
+                    go.Bar(
+                        x=df_saving["saving_medio"],
+                        y=df_saving["fornecedor_cotacao"],
+                        orientation="h",
+                        marker=dict(
+                            color=[paleta_fornecedores.get(f, "#64748b") for f in df_saving["fornecedor_cotacao"]],
+                            line=dict(width=0),
+                        ),
+                        text=[f"<b>+{s:.1f}% saving</b>" for s in df_saving["saving_medio"]],
+                        textposition="auto",
+                        textfont=dict(color="#ffffff", size=13),
+                        hovertemplate="<b>%{y}</b><br>Economia Média: %{x:.2f}%<extra></extra>",
+                    )
+                )
+                fig_saving.update_layout(
+                    title=dict(text="<b>💰 Competitividade de Custo</b> (Saving Médio vs. Tabela)", font=dict(size=14, color="#1e293b")),
+                    plot_bgcolor="#ffffff",
+                    paper_bgcolor="#ffffff",
+                    height=260,
+                    margin=dict(t=45, b=25, l=10, r=20),
+                    xaxis=dict(
+                        showgrid=True,
+                        gridcolor="#f1f5f9",
+                        title="% de Economia em Relação ao Preço Base",
+                        ticksuffix="%",
+                        zeroline=False,
+                    ),
+                    yaxis=dict(
+                        showgrid=False,
+                        tickfont=dict(size=12, color="#0f172a"),
+                    ),
+                )
+                st.plotly_chart(fig_saving, use_container_width=True)
+
+            # 4. Quadro Sintético de Decisão de Compra
+            st.markdown("###### 📋 Quadro Sintético de Decisão de Compra")
+            
+            def classificar_estrategia(row):
+                if row["fornecedor_cotacao"] == mais_agil["fornecedor_cotacao"] and row["fornecedor_cotacao"] == mais_economico["fornecedor_cotacao"]:
+                    return "⭐ Campeão Geral: Melhor Preço e Entrega Mais Rápida"
+                elif row["fornecedor_cotacao"] == mais_agil["fornecedor_cotacao"]:
+                    return "🚀 Entrega Rápida: Indicado para Reposições Urgentes e Rupturas"
+                elif row["fornecedor_cotacao"] == mais_economico["fornecedor_cotacao"]:
+                    return "💡 Menor Custo: Indicado para Compras Programadas de Alto Volume"
+                elif row["fornecedor_cotacao"] == menor_lote["fornecedor_cotacao"]:
+                    return "📦 Baixo Volume: Indicado para Testes de Demanda e Estoque Enxuto"
+                else:
+                    return "⚖️ Oferta Equilibrada: Alternativa Concorrencial"
+
+            df_tabela_tradeoff = resumo_fornecedores.copy()
+            df_tabela_tradeoff["recomendacao"] = df_tabela_tradeoff.apply(classificar_estrategia, axis=1)
+
+            st.dataframe(
+                df_tabela_tradeoff[[
+                    "fornecedor_cotacao", "prazo_medio", "saving_medio", "preco_medio", "lote_medio", "recomendacao"
+                ]],
+                column_config={
+                    "fornecedor_cotacao": st.column_config.TextColumn("Fornecedor Parceiro"),
+                    "prazo_medio": st.column_config.NumberColumn("Prazo Médio", format="%.1f dias úteis"),
+                    "saving_medio": st.column_config.NumberColumn("Saving Médio", format="+%.1f%%"),
+                    "preco_medio": st.column_config.NumberColumn("Preço Médio Cotado", format="R$ %.2f"),
+                    "lote_medio": st.column_config.NumberColumn("Lote Mínimo Médio", format="%.0f un"),
+                    "recomendacao": st.column_config.TextColumn("Recomendação Estratégica"),
+                },
+                hide_index=True,
+                use_container_width=True,
+            )
+        else:
+            st.info("Nenhuma cotação encontrada para a categoria selecionada.")
 
         st.markdown("<br>", unsafe_allow_html=True)
 
