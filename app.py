@@ -118,6 +118,8 @@ def normalizar_url_banco(url: str) -> str:
 @st.cache_resource
 def obter_conexao():
     """Cria e reutiliza o pool de conexões do SQLAlchemy com o banco de dados Neon/Postgres com pre-ping e keepalive."""
+    if not database_url:
+        return None
     url_otimizada = normalizar_url_banco(database_url)
     engine_kwargs = {
         "pool_pre_ping": True,
@@ -139,7 +141,10 @@ def obter_conexao():
         try:
             return create_engine(database_url, pool_pre_ping=True, pool_recycle=180)
         except Exception:
-            return create_engine(database_url)
+            try:
+                return create_engine(database_url)
+            except Exception:
+                return None
 
 
 engine = obter_conexao()
@@ -147,6 +152,8 @@ engine = obter_conexao()
 
 def executar_query_com_retry(query_str: str, max_tentativas: int = 3) -> pd.DataFrame:
     """Executa consultas SQL com mecanismo de retry automático contra oscilações e quedas de conexão do Neon."""
+    if engine is None:
+        raise ConnectionError("Nenhuma conexão de banco configurada ou disponível.")
     ultimo_erro = None
     for tentativa in range(1, max_tentativas + 1):
         try:
@@ -398,7 +405,10 @@ if status_selecionado != "Todos":
 
 # Rodapé da sidebar
 st.sidebar.divider()
-st.sidebar.caption("🟢 **Banco Conectado:** PostgreSQL (Neon)")
+if engine is not None:
+    st.sidebar.caption("🟢 **Banco Conectado:** PostgreSQL (Neon)")
+else:
+    st.sidebar.caption("🟠 **Modo:** Snapshot Local de Contingência")
 if not df.empty and "data_carga" in df.columns:
     ultima_atualizacao = pd.to_datetime(df["data_carga"].max()).strftime("%d/%m/%Y %H:%M:%S")
     st.sidebar.caption(f"🕒 **Última Carga:** {ultima_atualizacao}")
