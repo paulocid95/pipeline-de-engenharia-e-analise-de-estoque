@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+import time
 from dotenv import load_dotenv
 import pandas as pd
 import plotly.express as px
@@ -112,22 +113,56 @@ def normalizar_url_banco(url: str) -> str:
 
 @st.cache_resource
 def obter_conexao():
-    """Cria e reutiliza o pool de conexões do SQLAlchemy com o banco de dados."""
+    """Cria e reutiliza o pool de conexões do SQLAlchemy com o banco de dados Neon/Postgres com pre-ping e keepalive."""
     url_otimizada = normalizar_url_banco(database_url)
+    engine_kwargs = {
+        "pool_pre_ping": True,
+        "pool_recycle": 180,
+        "pool_size": 5,
+        "max_overflow": 10,
+        "connect_args": {
+            "connect_timeout": 15,
+            "keepalives": 1,
+            "keepalives_idle": 30,
+            "keepalives_interval": 10,
+            "keepalives_count": 5,
+        },
+    }
     try:
-        return create_engine(url_otimizada)
+        return create_engine(url_otimizada, **engine_kwargs)
     except Exception:
-        # Fallback para a URL original se o driver explícito não responder
-        return create_engine(database_url)
+        # Fallback para a URL original com pre-ping e pool_recycle habilitados
+        try:
+            return create_engine(database_url, pool_pre_ping=True, pool_recycle=180)
+        except Exception:
+            return create_engine(database_url)
 
 
 engine = obter_conexao()
 
 
+def executar_query_com_retry(query_str: str, max_tentativas: int = 3) -> pd.DataFrame:
+    """Executa consultas SQL com mecanismo de retry automático contra oscilações e quedas de conexão do Neon."""
+    ultimo_erro = None
+    for tentativa in range(1, max_tentativas + 1):
+        try:
+            return pd.read_sql(text(query_str), engine)
+        except Exception as e:
+            ultimo_erro = e
+            # Em caso de SSL closed ou timeout, descarta conexões mortas do pool
+            try:
+                engine.dispose()
+            except Exception:
+                pass
+            if tentativa < max_tentativas:
+                time.sleep(0.5 * tentativa)
+    raise ultimo_erro
+
+
 # ==============================================================================
 # 3. CONSULTA ANALÍTICA COM CACHE E ENRIQUECIMENTO DIMENSIONAL
 # ==============================================================================
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=300)
 def carregar_dados_analiticos() -> pd.DataFrame:
     """Consulta analítica no PostgreSQL (traz apenas o snapshot mais recente por SKU).
     
@@ -149,7 +184,29 @@ def carregar_dados_analiticos() -> pd.DataFrame:
         LEFT JOIN core.dim_categorias c ON p.id_categoria = c.id_categoria
         ORDER BY p.sku, f.data_carga DESC;
     """
-    df_raw = pd.read_sql(text(query), engine)
+    try:
+        df_raw = executar_query_com_retry(query)
+    except Exception as e:
+        # Fallback de contingência caso o Neon esteja momentaneamente reiniciando
+        caminho_csv = Path("dados_processados") / "estoque_consolidado_limpo.csv"
+        if caminho_csv.exists():
+            df_csv = pd.read_csv(caminho_csv)
+            df_raw = pd.DataFrame({
+                "sku": df_csv["id_produto"],
+                "nome_produto": df_csv["produto"],
+                "nome_categoria": df_csv["categoria"],
+                "fornecedor": df_csv["fornecedor"],
+                "preco_unitario": df_csv["preco"],
+                "quantidade_disponivel": df_csv["estoque"],
+                "valor_total_estoque": df_csv["preco"] * df_csv["estoque"],
+                "status_reposicao": df_csv["estoque"].apply(
+                    lambda q: "CRITICO" if q <= 5 else ("ALERTA" if q <= 15 else "NORMAL")
+                ),
+                "data_carga": pd.Timestamp.now(),
+            })
+            st.warning("⚠️ Conexão com o banco Neon em reinicialização rápida. Exibindo dados do snapshot local de contingência.")
+        else:
+            raise e
 
     # Fallback de integridade: se algum fornecedor estiver ausente, enriquece com a base consolidada
     if df_raw["fornecedor"].isna().any() or (df_raw["fornecedor"] == "Não Informado").any():
@@ -162,7 +219,7 @@ def carregar_dados_analiticos() -> pd.DataFrame:
     return df_raw.sort_values(by="valor_total_estoque", ascending=False)
 
 
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=300)
 def carregar_dados_cotacoes() -> pd.DataFrame:
     """Consulta analítica de cotações concorrentes unida às dimensões e status atual."""
     query = """
@@ -193,7 +250,14 @@ def carregar_dados_cotacoes() -> pd.DataFrame:
         ) f ON p.id_produto = f.id_produto
         ORDER BY p.sku, c.preco_cotado ASC;
     """
-    return pd.read_sql(text(query), engine)
+    try:
+        return executar_query_com_retry(query)
+    except Exception:
+        return pd.DataFrame(columns=[
+            "id_cotacao", "sku", "nome_produto", "nome_categoria", "preco_referencia",
+            "fornecedor_cotacao", "preco_cotado", "lote_minimo", "prazo_dias",
+            "data_cotacao", "status_reposicao", "quantidade_disponivel"
+        ])
 
 
 df = carregar_dados_analiticos()
@@ -249,6 +313,10 @@ st.sidebar.caption("🟢 **Banco Conectado:** PostgreSQL (Neon)")
 if not df.empty and "data_carga" in df.columns:
     ultima_atualizacao = pd.to_datetime(df["data_carga"].max()).strftime("%d/%m/%Y %H:%M:%S")
     st.sidebar.caption(f"🕒 **Última Carga:** {ultima_atualizacao}")
+
+if st.sidebar.button("🔄 Atualizar Dados", use_container_width=True):
+    st.cache_data.clear()
+    st.rerun()
 
 
 # ==============================================================================
