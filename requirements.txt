@@ -10,3 +10,4 @@ psycopg-binary
 psycopg
 python-dotenv
 google-genai
+openpyxl
