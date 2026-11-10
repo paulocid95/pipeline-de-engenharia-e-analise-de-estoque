@@ -436,6 +436,12 @@ python consultar_banco.py
 > python pipeline_completo.py
 > ```
 
+> 🧪 **Testes Automatizados:** As regras de limpeza (preços, estoques, categorias) e de status de reposição são cobertas por testes com `pytest`:
+> ```bash
+> pip install -r requirements-dev.txt
+> pytest
+> ```
+
 ### 6. Iniciar o Dashboard Interativo Localmente
 
 Para rodar o painel analítico localmente consumindo a base do Neon:

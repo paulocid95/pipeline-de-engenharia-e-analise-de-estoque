@@ -1,0 +1,3 @@
+# Dependências apenas para desenvolvimento e testes (não usadas pelo app em produção)
+-r requirements.txt
+pytest
