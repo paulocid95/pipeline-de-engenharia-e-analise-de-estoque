@@ -16,9 +16,9 @@
 ![Seaborn](https://img.shields.io/badge/Seaborn-0.13%2B-blueviolet)
 ![Git](https://img.shields.io/badge/Git-VCS-F05032?logo=git&logoColor=white)
 ![Status](https://img.shields.io/badge/Status-Concluído-success)
-![License](https://img.shields.io/badge/Licença-MIT-green)
+[![License](https://img.shields.io/badge/Licença-MIT-green)](LICENSE)
 
-Solução modular e automatizada de **Engenharia e Análise de Dados** ponta a ponta desenvolvida em **Python** e **Pandas**, com persistência relacional no **Neon PostgreSQL (Cloud)** com **SQLAlchemy**, orquestração completa do pipeline de ETL, geração de relatórios executivos e disponibilização de um dashboard interativo em tempo real hospedado no **Streamlit Community Cloud**. A plataforma conta agora com um **Assistente Virtual de Suprimentos e Compras com IA Generativa (Google Gemini)** integrado diretamente à base em tempo real, permitindo aos gestores consultar diagnósticos operacionais, recomendações multicritério de cotações de fornecedores e planos de mitigação de rupturas de estoque com streaming nativo e zero alucinação. O sistema realiza data profiling, higienização, mapeamento para schema canônico, carga em **Star Schema**, cálculo de indicadores financeiros e auditoria preditiva a partir de fontes de múltiplos fornecedores.
+Solução modular e automatizada de **Engenharia e Análise de Dados** ponta a ponta desenvolvida em **Python** e **Pandas**, com persistência relacional no **Neon PostgreSQL (Cloud)** com **SQLAlchemy**, orquestração completa do pipeline de ETL, geração de relatórios executivos e disponibilização de um dashboard interativo em tempo real hospedado no **Streamlit Community Cloud**. A plataforma conta agora com um **Assistente Virtual de Suprimentos e Compras com IA Generativa (Google Gemini)** integrado diretamente à base em tempo real, permitindo aos gestores consultar diagnósticos operacionais, recomendações multicritério de cotações de fornecedores e planos de mitigação de rupturas de estoque com streaming nativo e respostas ancoradas nos dados reais do banco. O sistema realiza data profiling, higienização, mapeamento para schema canônico, carga em **Star Schema**, cálculo de indicadores financeiros e auditoria preditiva a partir de fontes de múltiplos fornecedores.
 
 
 
@@ -139,7 +139,11 @@ pipeline-analise-estoque-python/
 ├── assistente_estoque.py                  # Módulo de IA: Chatbot e inteligência de compras com Google Gemini
 ├── app.py                                 # Painel analítico interativo com 5 abas via Streamlit
 │
-├── requirements.txt                       # Dependências do ambiente Python (inclui google-genai)
+├── requirements.txt                       # Dependências do ambiente Python com versões fixadas
+├── requirements-dev.txt                   # Dependências de desenvolvimento (pytest)
+├── pytest.ini                             # Configuração dos testes automatizados
+├── tests/                                 # Testes da limpeza de dados e das regras de estoque
+├── LICENSE                                # Licença MIT
 ├── .env                                   # Variáveis de ambiente e credenciais (DATABASE_URL, GEMINI_API_KEY)
 ├── .gitignore                             # Regras de exclusão do Git
 └── README.md                              # Documentação principal do projeto
@@ -267,13 +271,13 @@ Foram identificados **8 produtos com estoque zerado**, demandando reposição im
 
 ## 🤖 Assistente de IA & Inteligência de Compras (Google Gemini)
 
-O projeto integra um assistente inteligente de ponta a ponta (`assistente_estoque.py`) alimentado pelo **Google Gemini** (modelo padrão `gemini-3.8-flash`), atuando como um consultor executivo sênior de *Supply Chain & Procurement Analytics*. A ferramenta transforma o painel estático em um copiloto de compras proativo, capaz de analisar a saúde dos estoques, cruzar cotações de fornecedores e formular estratégias de mitigação de rupturas com respostas embasadas em dados reais (zero alucinação).
+O projeto integra um assistente inteligente de ponta a ponta (`assistente_estoque.py`) alimentado pelo **Google Gemini** (modelo padrão `gemini-3.8-flash`), atuando como um consultor executivo sênior de *Supply Chain & Procurement Analytics*. A ferramenta transforma o painel estático em um copiloto de compras proativo, capaz de analisar a saúde dos estoques, cruzar cotações de fornecedores e formular estratégias de mitigação de rupturas com respostas embasadas nos dados reais do banco, injetados no contexto a cada consulta.
 
 ### 1. 🧠 Context Injection em Tempo Real (Ground Truth Estruturado)
 Diferente de chatbots genéricos desconectados do ecossistema de dados, o assistente utiliza **injeção de contexto em tempo real** diretamente do Data Warehouse (**Neon PostgreSQL / Schema `core`**):
 * **Extração Dinâmica de Estado:** A cada consulta, a função `extrair_contexto_executivo_estoque()` consulta a visão unificada do estoque (`core.fato_estoque`, `core.dim_produtos`, `core.dim_categorias`), mapeando SKUs críticos (`quantidade_disponivel = 0`), itens em alerta de ressuprimento (`quantidade_disponivel <= estoque_minimo`) e capital imobilizado.
 * **Matriz de Cotações Concorrentes:** Extrai a tabela fato de compras (`core.fato_cotacoes`), identificando para cada SKU a precificação unitária de múltiplos fornecedores, prazos de entrega (*Lead Time* em dias corridos) e lotes mínimos exigidos (*MOQ*).
-* **System Instruction Especializado:** O contexto operacional higienizado é incorporado diretamente nas instruções do sistema (`system_instruction`), garantindo conformidade analítica estrita, vocabulário corporativo de suprimentos (PT-BR) e proibição absoluta de inventar SKUs, preços ou cotações inexistentes.
+* **System Instruction Especializado:** O contexto operacional higienizado é incorporado diretamente nas instruções do sistema (`system_instruction`), garantindo conformidade analítica estrita, vocabulário corporativo de suprimentos (PT-BR) e instrução explícita para não inventar SKUs, preços ou cotações que não estejam no contexto.
 * **Tabelas Markdown Mandatórias:** O assistente formata recomendações de reposição prioritariamente em tabelas estruturadas contendo: `Produto Crítico`, `Fornecedor Recomendado`, `Preço Cotado (R$)`, `Prazo de Entrega (dias)` e `Justificativa da Escolha`.
 
 ### 2. 🎯 Apoio à Decisão de Suprimentos & Procurement Multicritério
@@ -460,6 +464,12 @@ A aplicação será aberta automaticamente em seu navegador padrão no endereço
 ---
 
 
+
+## 📄 Licença
+
+Este projeto está sob a licença MIT. Consulte o arquivo [LICENSE](LICENSE) para mais detalhes.
+
+---
 
 ## 👨‍💻 Autor
 
