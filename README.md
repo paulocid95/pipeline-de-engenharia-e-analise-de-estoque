@@ -137,7 +137,15 @@ pipeline-analise-estoque-python/
 ├── pipeline_completo.py                   # Orquestrador mestre automatizado de ponta a ponta
 │
 ├── assistente_estoque.py                  # Módulo de IA: Chatbot e inteligência de compras com Google Gemini
-├── app.py                                 # Painel analítico interativo com 5 abas via Streamlit
+├── app.py                                 # Ponto de entrada do painel Streamlit (filtros, KPIs e abas)
+├── dashboard/                             # Módulos do painel Streamlit
+│   ├── dados.py                           # Conexão com cache, retry e consultas analíticas
+│   ├── estilo.py                          # CSS customizado (cards, banners e abas)
+│   ├── formatacao.py                      # Moeda em R$ e exportação Excel estilizada
+│   ├── aba_visao_geral.py                 # Aba 1: Visão Geral & Ruptura
+│   ├── aba_fornecedores.py                # Aba 2: Análise de Fornecedores
+│   ├── aba_compras.py                     # Aba 3: Inteligência de Compras & Cotações
+│   └── aba_tabela.py                      # Aba 4: Tabela Operacional & Exportação
 │
 ├── requirements.txt                       # Dependências do ambiente Python com versões fixadas
 ├── requirements-dev.txt                   # Dependências de desenvolvimento (pytest)
