@@ -79,7 +79,7 @@ def renderizar(df_filtrado: pd.DataFrame) -> None:
             margin=dict(l=20, r=20, t=50, b=40),
         )
         fig_comparativo.update_yaxes(showgrid=True, gridcolor="#e2e8f0")
-        st.plotly_chart(fig_comparativo, use_container_width=True)
+        st.plotly_chart(fig_comparativo, width="stretch")
 
         # Tabela Consolidada Executiva por Fornecedor
         st.markdown("##### 📌 Tabela de Participação dos Fornecedores")
@@ -105,7 +105,7 @@ def renderizar(df_filtrado: pd.DataFrame) -> None:
                 "ticket_medio": st.column_config.NumberColumn("Ticket Médio", format="R$ %.2f"),
             },
             hide_index=True,
-            use_container_width=True,
+            width="stretch",
         )
     else:
         st.info("ℹ️ Nenhum dado de fornecedor correspondente aos filtros selecionados.")

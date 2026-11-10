@@ -76,7 +76,7 @@ def renderizar(df_cot_filtrado: pd.DataFrame) -> None:
                     "data_cotacao": st.column_config.DatetimeColumn("Data Cotação", format="DD/MM/YYYY HH:mm"),
                 },
                 hide_index=True,
-                use_container_width=True,
+                width="stretch",
             )
 
         st.markdown("<br>", unsafe_allow_html=True)
@@ -113,7 +113,7 @@ def renderizar(df_cot_filtrado: pd.DataFrame) -> None:
                     "prazo_dias": st.column_config.NumberColumn("Prazo", format="%d dias"),
                 },
                 hide_index=True,
-                use_container_width=True,
+                width="stretch",
             )
         else:
             st.success("✅ **Nenhum produto em status CRÍTICO ou ALERTA** requer recompra urgente nos filtros atuais.")
@@ -224,7 +224,7 @@ def renderizar(df_cot_filtrado: pd.DataFrame) -> None:
                         tickfont=dict(size=12, color="#0f172a"),
                     ),
                 )
-                st.plotly_chart(fig_prazo, use_container_width=True)
+                st.plotly_chart(fig_prazo, width="stretch")
 
             with col_g2:
                 # Gráfico 2: Saving Médio (% de Desconto frente à referência)
@@ -262,7 +262,7 @@ def renderizar(df_cot_filtrado: pd.DataFrame) -> None:
                         tickfont=dict(size=12, color="#0f172a"),
                     ),
                 )
-                st.plotly_chart(fig_saving, use_container_width=True)
+                st.plotly_chart(fig_saving, width="stretch")
 
             # 4. Quadro Sintético de Decisão de Compra
             st.markdown("###### 📋 Quadro Sintético de Decisão de Compra")
@@ -295,7 +295,7 @@ def renderizar(df_cot_filtrado: pd.DataFrame) -> None:
                     "recomendacao": st.column_config.TextColumn("Recomendação Estratégica"),
                 },
                 hide_index=True,
-                use_container_width=True,
+                width="stretch",
             )
         else:
             st.info("Nenhuma cotação encontrada para a categoria selecionada.")
@@ -353,7 +353,7 @@ def renderizar(df_cot_filtrado: pd.DataFrame) -> None:
                     "data_cotacao": st.column_config.DatetimeColumn("Data da Cotação", format="DD/MM/YYYY HH:mm"),
                 },
                 hide_index=True,
-                use_container_width=True,
+                width="stretch",
             )
     else:
         st.info("ℹ️ Nenhuma cotação encontrada para os filtros selecionados.")

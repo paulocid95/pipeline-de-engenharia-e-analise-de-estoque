@@ -34,7 +34,7 @@ def renderizar(df_filtrado: pd.DataFrame) -> None:
             "valor_total_estoque": st.column_config.NumberColumn("Valor em Estoque", format="R$ %.2f"),
             "status_reposicao": st.column_config.TextColumn("Status de Reposição"),
         },
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
@@ -51,7 +51,7 @@ def renderizar(df_filtrado: pd.DataFrame) -> None:
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             help="Download do relatório profissional formatado em Excel com cabeçalho estilizado, autoajuste de colunas e moeda em R$.",
             type="primary",
-            use_container_width=True,
+            width="stretch",
         )
     with col_btn_csv:
         st.download_button(
@@ -60,7 +60,7 @@ def renderizar(df_filtrado: pd.DataFrame) -> None:
             file_name="relatorio_estoque_filtrado.csv",
             mime="text/csv",
             help="Download dos dados filtrados em formato texto CSV padrão (separador ponto e vírgula).",
-            use_container_width=True,
+            width="stretch",
         )
     with col_info:
         st.caption(f"📊 **Total de registros disponíveis para download:** {len(df_exibicao)} produtos filtrados.")

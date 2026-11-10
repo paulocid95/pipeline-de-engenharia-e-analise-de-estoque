@@ -75,7 +75,7 @@ if not df.empty and "data_carga" in df.columns:
     ultima_atualizacao = pd.to_datetime(df["data_carga"].max()).strftime("%d/%m/%Y %H:%M:%S")
     st.sidebar.caption(f"🕒 **Última Carga:** {ultima_atualizacao}")
 
-if st.sidebar.button("🔄 Atualizar Dados", use_container_width=True):
+if st.sidebar.button("🔄 Atualizar Dados", width="stretch"):
     st.cache_data.clear()
     st.rerun()
 

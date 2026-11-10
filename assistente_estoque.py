@@ -439,7 +439,7 @@ def renderizar_interface_chat(engine: Engine) -> None:
             )
 
     with col_btn:
-        if st.button("🗑️ Limpar Chat", use_container_width=True, help="Reinicia o histórico da conversa"):
+        if st.button("🗑️ Limpar Chat", width="stretch", help="Reinicia o histórico da conversa"):
             st.session_state.messages = [
                 {
                     "role": "assistant",
@@ -454,13 +454,13 @@ def renderizar_interface_chat(engine: Engine) -> None:
     pergunta_clicada = None
 
     with col_q1:
-        if st.button("🚨 Produtos Críticos Hoje", use_container_width=True, disabled=limite_atingido):
+        if st.button("🚨 Produtos Críticos Hoje", width="stretch", disabled=limite_atingido):
             pergunta_clicada = "Quais produtos estão em nível crítico hoje e quais os melhores fornecedores para reposição imediata?"
     with col_q2:
-        if st.button("⏱️ Fornecedores Mais Ágeis", use_container_width=True, disabled=limite_atingido):
+        if st.button("⏱️ Fornecedores Mais Ágeis", width="stretch", disabled=limite_atingido):
             pergunta_clicada = "Quais são os fornecedores com menor prazo de entrega (lead time mais rápido) para cada produto?"
     with col_q3:
-        if st.button("💰 Melhores Preços de Cotação", use_container_width=True, disabled=limite_atingido):
+        if st.button("💰 Melhores Preços de Cotação", width="stretch", disabled=limite_atingido):
             pergunta_clicada = "Qual fornecedor oferece o menor preço unitário por produto e qual a economia estimada?"
 
     # 4. Renderiza histórico de mensagens

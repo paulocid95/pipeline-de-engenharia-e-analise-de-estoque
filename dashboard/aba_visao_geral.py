@@ -55,7 +55,7 @@ def renderizar(df_filtrado: pd.DataFrame, valor_total: float) -> None:
                 height=380,
                 margin=dict(l=10, r=90, t=20, b=40),
             )
-            st.plotly_chart(fig_cat, use_container_width=True)
+            st.plotly_chart(fig_cat, width="stretch")
         else:
             st.info("ℹ️ Não há capital imobilizado para os filtros selecionados (Estoque Zerado / R$ 0,00).")
 
@@ -93,7 +93,7 @@ def renderizar(df_filtrado: pd.DataFrame, valor_total: float) -> None:
                 height=380,
                 margin=dict(l=20, r=20, t=20, b=40),
             )
-            st.plotly_chart(fig_status, use_container_width=True)
+            st.plotly_chart(fig_status, width="stretch")
         else:
             st.info("ℹ️ Nenhum dado disponível para os filtros selecionados.")
 
@@ -133,7 +133,7 @@ def renderizar(df_filtrado: pd.DataFrame, valor_total: float) -> None:
                 ),
             },
             hide_index=True,
-            use_container_width=True,
+            width="stretch",
         )
     else:
         st.success("✅ **Nenhum produto zerado ou em ruptura crítica** para o conjunto de filtros aplicado.")
