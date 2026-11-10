@@ -5,6 +5,7 @@ import pandas as pd
 from sqlalchemy import text
 
 from db import criar_engine
+from regras_estoque import classificar_status
 
 # 1. Conexão centralizada (ver db.py)
 engine = criar_engine()
@@ -26,15 +27,6 @@ def carregar_pipeline():
     df["preco"] = pd.to_numeric(df["preco"], errors="coerce").fillna(0.0)
     df["estoque"] = pd.to_numeric(df["estoque"], errors="coerce").fillna(0).astype(int)
     df["valor_total"] = (df["preco"] * df["estoque"]).round(2)
-
-    def classificar_status(qtd: int) -> str:
-        if qtd == 0:
-            return "CRITICO"
-        if qtd <= 15:
-            return "ALERTA"
-        if qtd > 100:
-            return "EXCESSO"
-        return "NORMAL"
 
     df["status_reposicao"] = df["estoque"].apply(classificar_status)
 

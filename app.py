@@ -14,6 +14,7 @@ from sqlalchemy import create_engine, text
 import streamlit as st
 from assistente_estoque import renderizar_interface_chat
 from db import normalizar_url_banco
+from regras_estoque import classificar_status
 
 # ==============================================================================
 # 1. CONFIGURAÇÃO DA PÁGINA
@@ -199,9 +200,7 @@ def carregar_dados_analiticos() -> pd.DataFrame:
                 "preco_unitario": df_csv["preco"],
                 "quantidade_disponivel": df_csv["estoque"],
                 "valor_total_estoque": df_csv["preco"] * df_csv["estoque"],
-                "status_reposicao": df_csv["estoque"].apply(
-                    lambda q: "CRITICO" if q <= 5 else ("ALERTA" if q <= 15 else "NORMAL")
-                ),
+                "status_reposicao": df_csv["estoque"].apply(classificar_status),
                 "data_carga": pd.Timestamp.now(),
             })
             st.warning("⚠️ Conexão com o banco Neon em reinicialização rápida. Exibindo dados do snapshot local de contingência.")
