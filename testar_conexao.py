@@ -1,18 +1,11 @@
-import os
-from dotenv import load_dotenv
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
 
-load_dotenv()
-
-database_url = os.getenv("DATABASE_URL")
-
-if database_url and database_url.startswith("postgres://"):
-    database_url = database_url.replace("postgres://", "postgresql://", 1)
+from db import criar_engine
 
 print("Tentando conectar ao PostgreSQL no Neon...")
 
 try:
-    engine = create_engine(database_url)
+    engine = criar_engine()
     with engine.connect() as conexao:
         resultado = conexao.execute(text("SELECT version();"))
         print("\nConexão realizada com sucesso!")

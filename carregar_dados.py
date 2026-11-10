@@ -2,20 +2,12 @@ import os
 import sys
 from datetime import datetime, timezone
 import pandas as pd
-from dotenv import load_dotenv
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
 
-# 1. Carregar variáveis de ambiente do arquivo .env
-load_dotenv()
-database_url = os.getenv("DATABASE_URL")
+from db import criar_engine
 
-if database_url and database_url.startswith("postgres://"):
-    database_url = database_url.replace("postgres://", "postgresql://", 1)
-
-if not database_url:
-    raise ValueError("A variável DATABASE_URL não foi encontrada no arquivo .env.")
-
-engine = create_engine(database_url, echo=False)
+# 1. Conexão centralizada (ver db.py)
+engine = criar_engine()
 
 
 def carregar_pipeline():

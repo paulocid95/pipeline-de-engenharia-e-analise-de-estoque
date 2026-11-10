@@ -13,6 +13,7 @@ from plotly.subplots import make_subplots
 from sqlalchemy import create_engine, text
 import streamlit as st
 from assistente_estoque import renderizar_interface_chat
+from db import normalizar_url_banco
 
 # ==============================================================================
 # 1. CONFIGURAÇÃO DA PÁGINA
@@ -101,18 +102,6 @@ try:
     database_url = st.secrets.get("DATABASE_URL", os.getenv("DATABASE_URL"))
 except Exception:
     database_url = os.getenv("DATABASE_URL")
-
-
-def normalizar_url_banco(url: str) -> str:
-    """Normaliza o esquema da URL para compatibilidade garantida com drivers PostgreSQL no SQLAlchemy."""
-    if not url:
-        return ""
-    url = url.strip()
-    if url.startswith("postgres://"):
-        url = url.replace("postgres://", "postgresql+psycopg2://", 1)
-    elif url.startswith("postgresql://") and not url.startswith("postgresql+"):
-        url = url.replace("postgresql://", "postgresql+psycopg2://", 1)
-    return url
 
 
 @st.cache_resource
@@ -1115,4 +1104,4 @@ with tab_tabela:
 # ABA 5: ASSISTENTE DE IA & INTELIGÊNCIA DE COMPRAS
 # ------------------------------------------------------------------------------
 with tab_assistente:
-    renderizar_interface_chat(engine)
+    renderizar_interface_chat(engine)

@@ -13,22 +13,13 @@ Regras de negócio implementadas:
 """
 
 from datetime import datetime, timezone
-import os
 import random
-from dotenv import load_dotenv
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
 
-# 1. Configuração e conexão com o banco de dados
-load_dotenv()
-database_url = os.getenv("DATABASE_URL")
+from db import criar_engine
 
-if not database_url:
-    raise ValueError("A variável DATABASE_URL não foi encontrada no arquivo .env.")
-
-if database_url.startswith("postgres://"):
-    database_url = database_url.replace("postgres://", "postgresql://", 1)
-
-engine = create_engine(database_url)
+# 1. Conexão centralizada (ver db.py)
+engine = criar_engine()
 
 FORNECEDORES_HOMOLOGADOS = ["Fornecedor A", "Fornecedor B", "Fornecedor C"]
 

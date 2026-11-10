@@ -1,18 +1,10 @@
-import os
 import sys
-from dotenv import load_dotenv
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
 
-# 1. Carrega as variáveis de ambiente do arquivo .env
-load_dotenv()
-database_url = os.getenv("DATABASE_URL")
+from db import criar_engine
 
-# Compatibilidade de protocolo com SQLAlchemy
-if database_url and database_url.startswith("postgres://"):
-    database_url = database_url.replace("postgres://", "postgresql://", 1)
-
-# Cria o pool de conexão do SQLAlchemy
-engine = create_engine(database_url)
+# 1. Conexão centralizada (ver db.py)
+engine = criar_engine()
 
 # 2. Definição do DDL (Estrutura e integridade do banco)
 ddl_query = """

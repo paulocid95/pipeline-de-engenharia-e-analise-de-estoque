@@ -1,16 +1,9 @@
-import os
-from dotenv import load_dotenv
 import pandas as pd
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
 
-# Carregar variáveis de ambiente do .env
-load_dotenv()
-database_url = os.getenv("DATABASE_URL")
+from db import criar_engine
 
-if database_url and database_url.startswith("postgres://"):
-    database_url = database_url.replace("postgres://", "postgresql://", 1)
-
-engine = create_engine(database_url)
+engine = criar_engine()
 
 
 def consultar_dados():
