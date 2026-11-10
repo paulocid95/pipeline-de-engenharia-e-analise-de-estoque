@@ -5,6 +5,7 @@ arquitetura de resiliência com failover cascata de modelos (gemini-3.8-flash ->
 e entrega fluida via st.write_stream sem cortes ou truncamentos.
 """
 
+import logging
 import os
 import time
 from typing import Generator
@@ -12,6 +13,10 @@ import pandas as pd
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 import streamlit as st
+
+# Erros técnicos vão só para o log do servidor (visível apenas ao dono do app),
+# nunca para a tela, para não expor host, usuário do banco ou detalhes da API.
+logger = logging.getLogger(__name__)
 
 
 # ==============================================================================
@@ -94,8 +99,9 @@ def extrair_contexto_executivo_estoque(_engine: Engine) -> str:
         """
         df_cot = pd.read_sql(text(query_cotacoes), _engine)
 
-    except Exception as e:
-        return f"Aviso de banco: Não foi possível obter o contexto atualizado ({str(e)})."
+    except Exception:
+        logger.exception("Falha ao obter contexto do banco para o assistente")
+        return "Aviso de banco: Não foi possível obter o contexto atualizado no momento."
 
     if df_est.empty:
         return "Aviso: Nenhum registro de estoque encontrado na base de dados."
@@ -332,9 +338,10 @@ def gerar_resposta_assistente_stream(
 
     # Se nenhum modelo conseguiu responder
     if not texto_final:
+        if ultimo_erro is not None:
+            logger.error("Falha em todos os modelos Gemini: %r", ultimo_erro)
         yield (
             "⚠️ **Os servidores de IA estão temporariamente indisponíveis no momento.**\n\n"
-            f"Detalhes técnicos: {str(ultimo_erro)}\n\n"
             "👉 Por favor, aguarde alguns instantes e reenvie sua pergunta."
         )
         return
