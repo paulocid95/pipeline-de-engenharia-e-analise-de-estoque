@@ -128,9 +128,10 @@ pipeline-analise-estoque-python/
 ├── analise_negocio.py                     # Cálculo de KPIs financeiros e detecção de rupturas
 ├── visualizacao_graficos.py               # Visualização e renderização gráfica executiva
 │
-├── criar_tabelas.py                       # DDL: Provisionamento de schemas, tabelas e constraints SQL
-├── criar_tabela_cotacoes.py               # DDL: Tabela fato de cotações concorrentes (core.fato_cotacoes)
+├── criar_tabelas.py                       # DDL: Provisionamento de schemas, tabelas (incl. core.fato_cotacoes) e constraints SQL
 ├── gerar_cotacoes_fornecedores.py         # Simulação e carga de matriz concorrente de cotações
+├── db.py                                  # Conexão centralizada com o PostgreSQL (usada por todos os scripts)
+├── regras_estoque.py                      # Regras de status de reposição (CRITICO, ALERTA, NORMAL, EXCESSO)
 ├── carregar_dados.py                      # Ingestão dimensional com Upsert no Neon PostgreSQL
 ├── consultar_banco.py                     # Auditoria pós-carga e consultas SQL analíticas
 ├── pipeline_completo.py                   # Orquestrador mestre automatizado de ponta a ponta
@@ -417,19 +418,16 @@ python analise_negocio.py
 # 5. Gerar e salvar os gráficos executivos em alta resolução (pasta graficos/)
 python visualizacao_graficos.py
 
-# 6. Provisionar o schema relacional e as tabelas com constraints no PostgreSQL
+# 6. Provisionar o schema relacional e as tabelas (incluindo cotações) no PostgreSQL
 python criar_tabelas.py
 
-# 7. Provisionar a tabela fato de cotações concorrentes dos fornecedores
-python criar_tabela_cotacoes.py
+# 7. Executar a ingestão dimensional com lógica de Upsert no banco de dados
+python carregar_dados.py
 
 # 8. Simular a matriz de cotações dos fornecedores e alimentar o banco de dados
 python gerar_cotacoes_fornecedores.py
 
-# 9. Executar a ingestão dimensional com lógica de Upsert no banco de dados
-python carregar_dados.py
-
-# 10. Executar validações e consultas analíticas de auditoria
+# 9. Executar validações e consultas analíticas de auditoria
 python consultar_banco.py
 ```
 

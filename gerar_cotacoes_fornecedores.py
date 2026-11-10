@@ -14,6 +14,7 @@ Regras de negócio implementadas:
 
 from datetime import datetime, timezone
 import random
+import sys
 from sqlalchemy import text
 
 from db import criar_engine
@@ -97,8 +98,8 @@ def executar_carga_cotacoes() -> None:
         print(f"[1/3] Produtos identificados na base dimensional: {total_produtos} SKUs")
 
         if total_produtos == 0:
-            print("[ALERTA] Nenhum produto encontrado em core.dim_produtos. Carga abortada.")
-            return
+            print("[ERRO] Nenhum produto encontrado em core.dim_produtos. Carga abortada.")
+            sys.exit(1)
 
         # 2. Simulação das cotações
         payload = simular_cotacoes_produtos(produtos)
