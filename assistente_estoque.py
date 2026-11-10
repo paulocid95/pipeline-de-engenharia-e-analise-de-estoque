@@ -31,6 +31,31 @@ MODELOS_CASCADE = [
 ]
 MODELO_PADRAO = MODELOS_CASCADE[0]
 
+# Proteção da cota da API Gemini em um app público (sem login)
+LIMITE_PERGUNTAS_SESSAO = 10
+INTERVALO_MINIMO_SEGUNDOS = 5
+# Cada pergunta faz no máximo 1 chamada por modelo da cascata (até 4 no total)
+TIMEOUT_CHAMADA_MS = 30_000
+
+
+def verificar_limite_perguntas(
+    perguntas_feitas: int,
+    ultimo_envio: float | None,
+    agora: float,
+    limite: int = LIMITE_PERGUNTAS_SESSAO,
+    intervalo_minimo: float = INTERVALO_MINIMO_SEGUNDOS,
+) -> str | None:
+    """Retorna a mensagem de bloqueio, ou None se a pergunta pode ser enviada."""
+    if perguntas_feitas >= limite:
+        return (
+            f"Você atingiu o limite de {limite} perguntas por sessão. "
+            "Este limite protege a cota da API nesta demonstração pública."
+        )
+    if ultimo_envio is not None and agora - ultimo_envio < intervalo_minimo:
+        espera = intervalo_minimo - (agora - ultimo_envio)
+        return f"Aguarde {espera:.0f} segundo(s) antes de enviar outra pergunta."
+    return None
+
 
 # ==============================================================================
 # 1. GESTÃO DE CREDENCIAIS E CHAVE DE API (SECRETS COM FALLBACK)
@@ -245,7 +270,7 @@ def gerar_resposta_assistente_stream(
     contexto_banco: str,
     api_key: str,
     modelo: str = MODELO_PADRAO,
-    max_retries: int = 3,
+    max_retries: int = 1,
     backoff_base: float = 1.5,
 ) -> Generator[str, None, None]:
     """Chama a API do Google Gemini com resiliência máxima e entrega fluida.
@@ -270,7 +295,8 @@ def gerar_resposta_assistente_stream(
         from google import genai
         from google.genai import types
 
-        client = genai.Client(api_key=api_key)
+        # Tempo limite por chamada: um modelo travado passa a vez ao próximo em vez de prender o usuário
+        client = genai.Client(api_key=api_key, http_options=types.HttpOptions(timeout=TIMEOUT_CHAMADA_MS))
 
         contents = []
         for msg in mensagens:
@@ -360,6 +386,12 @@ def gerar_resposta_assistente_stream(
 # ==============================================================================
 # 4. COMPONENTE DE INTERFACE STREAMLIT (LEVE & REATIVO)
 # ==============================================================================
+def _exibir_contador(espaco) -> None:
+    """Mostra quantas perguntas ainda restam na sessão."""
+    restantes = max(LIMITE_PERGUNTAS_SESSAO - st.session_state.perguntas_feitas, 0)
+    espaco.caption(f"💬 Perguntas restantes nesta sessão: **{restantes} de {LIMITE_PERGUNTAS_SESSAO}**")
+
+
 def renderizar_interface_chat(engine: Engine) -> None:
     """Renderiza a interface do chatbot dentro do Streamlit, com gerenciamento
 
@@ -378,6 +410,11 @@ def renderizar_interface_chat(engine: Engine) -> None:
             }
         ]
 
+    # Contador de uso da sessão (não é zerado pelo botão "Limpar Chat")
+    st.session_state.setdefault("perguntas_feitas", 0)
+    st.session_state.setdefault("ultimo_envio", None)
+    limite_atingido = st.session_state.perguntas_feitas >= LIMITE_PERGUNTAS_SESSAO
+
     # Banner informativo da aba
     st.markdown(
         '<div class="tab-banner">🤖 <strong>Assistente Virtual com IA:</strong> Análise de suprimentos, '
@@ -392,6 +429,8 @@ def renderizar_interface_chat(engine: Engine) -> None:
     with col_status:
         if api_key:
             st.caption(f"🟢 **IA Conectada:** Google Gemini ({MODELO_PADRAO} | Failover Ativo | PostgreSQL Neon)")
+            contador = st.empty()
+            _exibir_contador(contador)
         else:
             st.warning(
                 "🔑 **Chave de API não detectada.** Adicione `GEMINI_API_KEY = 'sua_chave'` em `.streamlit/secrets.toml` "
@@ -415,13 +454,13 @@ def renderizar_interface_chat(engine: Engine) -> None:
     pergunta_clicada = None
 
     with col_q1:
-        if st.button("🚨 Produtos Críticos Hoje", use_container_width=True):
+        if st.button("🚨 Produtos Críticos Hoje", use_container_width=True, disabled=limite_atingido):
             pergunta_clicada = "Quais produtos estão em nível crítico hoje e quais os melhores fornecedores para reposição imediata?"
     with col_q2:
-        if st.button("⏱️ Fornecedores Mais Ágeis", use_container_width=True):
+        if st.button("⏱️ Fornecedores Mais Ágeis", use_container_width=True, disabled=limite_atingido):
             pergunta_clicada = "Quais são os fornecedores com menor prazo de entrega (lead time mais rápido) para cada produto?"
     with col_q3:
-        if st.button("💰 Melhores Preços de Cotação", use_container_width=True):
+        if st.button("💰 Melhores Preços de Cotação", use_container_width=True, disabled=limite_atingido):
             pergunta_clicada = "Qual fornecedor oferece o menor preço unitário por produto e qual a economia estimada?"
 
     # 4. Renderiza histórico de mensagens
@@ -431,11 +470,28 @@ def renderizar_interface_chat(engine: Engine) -> None:
             st.markdown(msg["content"])
 
     # 5. Captura entrada do usuário (seja via digitação ou botão de prompt rápido)
-    user_prompt = st.chat_input("Ex: Qual o fornecedor mais vantajoso para o produto X considerando prazo de entrega?")
+    if limite_atingido:
+        st.info(
+            f"🔒 Limite de {LIMITE_PERGUNTAS_SESSAO} perguntas por sessão atingido. "
+            "Este limite protege a cota da API nesta demonstração pública."
+        )
+    user_prompt = st.chat_input(
+        "Ex: Qual o fornecedor mais vantajoso para o produto X considerando prazo de entrega?",
+        disabled=limite_atingido,
+    )
     if pergunta_clicada:
         user_prompt = pergunta_clicada
 
     if user_prompt:
+        agora = time.time()
+        bloqueio = verificar_limite_perguntas(
+            st.session_state.perguntas_feitas, st.session_state.ultimo_envio, agora
+        )
+        if bloqueio:
+            st.warning(f"⏳ {bloqueio}")
+            return
+        st.session_state.ultimo_envio = agora
+
         # Registra mensagem do usuário
         st.session_state.messages.append({"role": "user", "content": user_prompt})
         with st.chat_message("user", avatar="👤"):
@@ -451,6 +507,9 @@ def renderizar_interface_chat(engine: Engine) -> None:
                 st.error(resposta_vazia)
                 st.session_state.messages.append({"role": "assistant", "content": resposta_vazia})
             else:
+                st.session_state.perguntas_feitas += 1
+                if api_key:
+                    _exibir_contador(contador)
                 # Feedback visual suave enquanto consulta o banco e conecta à IA com retry e failover
                 with st.spinner("A consultar fornecedores e a calcular análise com a IA..."):
                     contexto_banco = extrair_contexto_executivo_estoque(engine)

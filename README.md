@@ -307,6 +307,7 @@ Toda a integração com a IA foi construída seguindo as melhores práticas de e
 * **Cache de Dados Analíticos (`@st.cache_data`):** A leitura das tabelas no banco de dados é cacheada com `ttl=60`, garantindo agilidade milissegunda na geração do contexto sem onerar a base relacional com queries redundantes.
 * **Streaming Fluido & Atômico:** O processamento gera respostas completas sem truncamento ou quebra de frases, sendo entregue ao usuário via streaming nativo do Streamlit (`st.write_stream`).
 * **Gestão Transparente de Credenciais:** Suporte nativo a credenciais tanto via `.env` (desenvolvimento local) quanto via `st.secrets` (`.streamlit/secrets.toml` ou painel do Streamlit Community Cloud), com verificação de status em tempo real exibida na interface.
+* **Proteção de Cota da API:** Limite de 10 perguntas por sessão, intervalo mínimo de 5 segundos entre envios e no máximo uma tentativa por modelo da cascata (com tempo limite de 30 s), evitando consumo excessivo da API em uma demonstração pública.
 
 ---
 
