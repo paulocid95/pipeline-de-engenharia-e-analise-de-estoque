@@ -1,4 +1,5 @@
 import os
+import sys
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
 
@@ -31,8 +32,12 @@ CREATE TABLE IF NOT EXISTS core.dim_produtos (
     nome_produto VARCHAR(255) NOT NULL,
     id_categoria INT REFERENCES core.dim_categorias(id_categoria) ON DELETE SET NULL,
     preco_unitario NUMERIC(10, 2) NOT NULL CHECK (preco_unitario >= 0),
-    estoque_minimo INT NOT NULL DEFAULT 0 CHECK (estoque_minimo >= 0)
+    estoque_minimo INT NOT NULL DEFAULT 0 CHECK (estoque_minimo >= 0),
+    fornecedor VARCHAR(100)
 );
+
+-- Garante a coluna em bancos criados antes dela existir no DDL
+ALTER TABLE core.dim_produtos ADD COLUMN IF NOT EXISTS fornecedor VARCHAR(100);
 
 -- Tabela Fato: Histórico e snapshots do estoque
 CREATE TABLE IF NOT EXISTS core.fato_estoque (
@@ -73,6 +78,8 @@ def provisionar_banco():
         print("Schema 'core', tabelas dimensionais, tabela fato e índices criados com sucesso!")
     except Exception as e:
         print(f"Erro ao provisionar banco de dados: {e}")
+        # Encerra com código de erro para o orquestrador interromper o pipeline
+        sys.exit(1)
 
 if __name__ == "__main__":
     provisionar_banco()

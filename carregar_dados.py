@@ -1,4 +1,5 @@
 import os
+import sys
 from datetime import datetime, timezone
 import pandas as pd
 from dotenv import load_dotenv
@@ -24,7 +25,7 @@ def carregar_pipeline():
     if not os.path.exists(caminho_arquivo):
         print(f"Erro: Arquivo canônico não encontrado em '{caminho_arquivo}'.")
         print("Certifique-se de executar 'limpeza_padronizacao.py' antes da carga.")
-        return
+        sys.exit(1)
 
     print(f"Lendo dados limpos de: {caminho_arquivo}")
     df = pd.read_csv(caminho_arquivo)
