@@ -4,8 +4,8 @@
 
 > 🚀 **Dashboard em Produção:** Acesse a aplicação interativa em tempo real: [estoque-dashboard-live.streamlit.app](https://estoque-dashboard-live.streamlit.app)
 
-![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)
-![Pandas](https://img.shields.io/badge/Pandas-2.0%2B-150458?logo=pandas&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.11%2B-blue?logo=python&logoColor=white)
+![Pandas](https://img.shields.io/badge/Pandas-3.0%2B-150458?logo=pandas&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Neon_Serverless-336791?logo=postgresql&logoColor=white)
 ![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-ORM%2FCore-D71F00?logo=sqlalchemy&logoColor=white)
 ![Google Gemini](https://img.shields.io/badge/Google%20Gemini-3.8%20Flash-4285F4?logo=googlegemini&logoColor=white)
@@ -90,7 +90,7 @@ O pipeline segue um fluxo lógico desacoplado e modular com arquitetura ponta a 
 
 | Camada | Tecnologia | Finalidade no Projeto |
 | :--- | :--- | :--- |
-| **Linguagem & Manipulação** | Python 3.10+, Pandas | Engenharia de dados, profiling exploratório, pipeline de ETL e cálculo de KPIs |
+| **Linguagem & Manipulação** | Python 3.11+, Pandas | Engenharia de dados, profiling exploratório, pipeline de ETL e cálculo de KPIs |
 | **Banco de Dados (Cloud)** | **Neon PostgreSQL (Cloud)** | Data Warehouse relacional serverless em nuvem com modelagem dimensional (*Star Schema*) |
 | **Conectividade & ORM** | SQLAlchemy, psycopg2-binary | Gerenciamento de engine, pool de conexões e execução transacional segura |
 | **Inteligência Artificial (GenAI)** | **Google Gemini (3.8 Flash)**, `google-genai` | Assistente virtual de suprimentos, recomendação multicritério de compras e resiliência em cascata |
