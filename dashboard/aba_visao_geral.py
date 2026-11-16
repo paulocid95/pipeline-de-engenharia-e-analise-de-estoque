@@ -6,6 +6,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from dashboard.formatacao import formatar_moeda_brl
+from dashboard.graficos import COR_DESTAQUE, COR_NEUTRA, CORES_STATUS, estilizar_grafico
 
 
 def renderizar(df_filtrado: pd.DataFrame, valor_total: float) -> None:
@@ -28,10 +29,10 @@ def renderizar(df_filtrado: pd.DataFrame, valor_total: float) -> None:
             df_cat["pct"] = (df_cat["valor_total"] / total_cat) * 100
             max_valor_cat = df_cat["valor_total"].max()
 
-            # Destaque focal em Smartphones (ou na categoria de maior representatividade)
+            # Destaque focal na categoria de maior capital retido
             cores_barras = [
-                "#1d4ed8" if cat == "Smartphones" else "#94a3b8"
-                for cat in df_cat["nome_categoria"]
+                COR_DESTAQUE if valor == max_valor_cat else COR_NEUTRA
+                for valor in df_cat["valor_total"]
             ]
 
             fig_cat = go.Figure()
@@ -55,6 +56,7 @@ def renderizar(df_filtrado: pd.DataFrame, valor_total: float) -> None:
                 height=380,
                 margin=dict(l=10, r=90, t=20, b=40),
             )
+            estilizar_grafico(fig_cat)
             st.plotly_chart(fig_cat, width="stretch")
         else:
             st.info("ℹ️ Não há capital imobilizado para os filtros selecionados (Estoque Zerado / R$ 0,00).")
@@ -66,20 +68,13 @@ def renderizar(df_filtrado: pd.DataFrame, valor_total: float) -> None:
             contagem_status = df_filtrado["status_reposicao"].value_counts().reset_index()
             contagem_status.columns = ["status_reposicao", "quantidade_skus"]
 
-            paleta_status = {
-                "CRITICO": "#dc2626",   # Vermelho
-                "ALERTA": "#f59e0b",    # Laranja/Amarelo
-                "NORMAL": "#16a34a",    # Verde
-                "EXCESSO": "#2563eb",   # Azul
-            }
-
             fig_status = px.pie(
                 contagem_status,
                 names="status_reposicao",
                 values="quantidade_skus",
-                hole=0.45,
+                hole=0.62,
                 color="status_reposicao",
-                color_discrete_map=paleta_status,
+                color_discrete_map=CORES_STATUS,
             )
             fig_status.update_traces(
                 textposition="inside",
@@ -93,6 +88,10 @@ def renderizar(df_filtrado: pd.DataFrame, valor_total: float) -> None:
                 height=380,
                 margin=dict(l=20, r=20, t=20, b=40),
             )
+            fig_status.add_annotation(
+                text=f"<b>{len(df_filtrado)}</b><br>SKUs", showarrow=False, font_size=20,
+            )
+            estilizar_grafico(fig_status)
             st.plotly_chart(fig_status, width="stretch")
         else:
             st.info("ℹ️ Nenhum dado disponível para os filtros selecionados.")

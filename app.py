@@ -11,7 +11,9 @@ from assistente_estoque import renderizar_interface_chat
 from dashboard import aba_compras, aba_fornecedores, aba_tabela, aba_visao_geral
 from dashboard.dados import carregar_dados_analiticos, carregar_dados_cotacoes, obter_conexao
 from dashboard.estilo import aplicar_estilo
+from dashboard.componentes import cabecalho, cartoes_kpi
 from dashboard.formatacao import formatar_moeda_brl
+from regras_estoque import LIMITE_ALERTA
 
 # ==============================================================================
 # 1. CONFIGURAÇÃO DA PÁGINA
@@ -83,24 +85,48 @@ if st.sidebar.button("🔄 Atualizar Dados", width="stretch"):
 # ==============================================================================
 # 3. CABEÇALHO E SCORECARDS EXECUTIVOS
 # ==============================================================================
-st.title("📦 Monitoramento e Gestão Analítica de Estoque")
-st.markdown("Painel executivo com atualização em tempo real conectado à infraestrutura de dados no **PostgreSQL (Neon)**.")
-
-st.divider()
-
-col_kpi1, col_kpi2, col_kpi3, col_kpi4 = st.columns(4)
-
 total_itens = int(df_filtrado["quantidade_disponivel"].sum())
 valor_total = float(df_filtrado["valor_total_estoque"].sum())
 itens_criticos = int((df_filtrado["status_reposicao"] == "CRITICO").sum())
 itens_alerta = int((df_filtrado["status_reposicao"] == "ALERTA").sum())
 
-col_kpi1.metric("📦 Volume Físico Total", f"{total_itens:,} un".replace(",", "."))
-col_kpi2.metric("💰 Capital Imobilizado", formatar_moeda_brl(valor_total))
-col_kpi3.metric("🚨 Produtos Críticos (Zerados)", itens_criticos)
-col_kpi4.metric("⚠️ Produtos em Alerta", itens_alerta)
+total_skus = len(df_filtrado)
+pct_criticos = (itens_criticos / total_skus * 100) if total_skus else 0
+valor_medio_sku = (valor_total / total_skus) if total_skus else 0
 
-st.divider()
+chips = [f"📦 {len(df)} SKUs monitorados"]
+if not df.empty and "data_carga" in df.columns:
+    chips.insert(0, f"🕒 Última carga: {pd.to_datetime(df['data_carga'].max()).strftime('%d/%m/%Y %H:%M')}")
+
+cabecalho(
+    titulo="Monitoramento e Gestão Analítica de Estoque",
+    texto="Painel executivo com saúde do estoque, concentração de fornecedores e inteligência de compras em um só lugar.",
+    conectado=engine is not None,
+    chips=chips,
+)
+
+cartoes_kpi([
+    {
+        "icone": "📦", "rotulo": "Volume físico", "tom": "marca",
+        "valor": f"{total_itens:,} un".replace(",", "."),
+        "detalhe": f"{total_skus} SKUs no filtro atual",
+    },
+    {
+        "icone": "💰", "rotulo": "Capital imobilizado", "tom": "positivo",
+        "valor": formatar_moeda_brl(valor_total),
+        "detalhe": f"Média de {formatar_moeda_brl(valor_medio_sku)} por SKU",
+    },
+    {
+        "icone": "🚨", "rotulo": "Produtos críticos", "tom": "critico",
+        "valor": itens_criticos,
+        "detalhe": f"{pct_criticos:.0f}% dos SKUs com estoque zerado",
+    },
+    {
+        "icone": "⚠️", "rotulo": "Produtos em alerta", "tom": "alerta",
+        "valor": itens_alerta,
+        "detalhe": f"Com até {LIMITE_ALERTA} unidades em estoque",
+    },
+])
 
 
 # ==============================================================================

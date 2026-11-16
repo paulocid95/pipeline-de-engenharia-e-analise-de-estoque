@@ -5,6 +5,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from dashboard.formatacao import formatar_moeda_brl
+from dashboard.graficos import CORES_FORNECEDOR, estilizar_grafico
 
 
 def renderizar(df_cot_filtrado: pd.DataFrame) -> None:
@@ -183,11 +184,7 @@ def renderizar(df_cot_filtrado: pd.DataFrame) -> None:
             # Dois Gráficos de Barras Horizontais Límpidos (Zero Sobreposição)
             col_g1, col_g2 = st.columns(2)
 
-            paleta_fornecedores = {
-                "Fornecedor A": "#2563eb",  # Azul Royal
-                "Fornecedor B": "#0d9488",  # Teal / Verde-azulado
-                "Fornecedor C": "#f59e0b",  # Âmbar / Laranja
-            }
+            paleta_fornecedores = CORES_FORNECEDOR
 
             with col_g1:
                 # Gráfico 1: Prazo Médio (quanto menor, mais ágil)
@@ -224,6 +221,7 @@ def renderizar(df_cot_filtrado: pd.DataFrame) -> None:
                         tickfont=dict(size=12, color="#0f172a"),
                     ),
                 )
+                estilizar_grafico(fig_prazo)
                 st.plotly_chart(fig_prazo, width="stretch")
 
             with col_g2:
@@ -262,6 +260,7 @@ def renderizar(df_cot_filtrado: pd.DataFrame) -> None:
                         tickfont=dict(size=12, color="#0f172a"),
                     ),
                 )
+                estilizar_grafico(fig_saving)
                 st.plotly_chart(fig_saving, width="stretch")
 
             # 4. Quadro Sintético de Decisão de Compra

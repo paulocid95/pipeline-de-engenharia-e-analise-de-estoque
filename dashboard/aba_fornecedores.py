@@ -6,6 +6,7 @@ import streamlit as st
 from plotly.subplots import make_subplots
 
 from dashboard.formatacao import formatar_moeda_brl
+from dashboard.graficos import estilizar_grafico
 
 
 def renderizar(df_filtrado: pd.DataFrame) -> None:
@@ -79,6 +80,7 @@ def renderizar(df_filtrado: pd.DataFrame) -> None:
             margin=dict(l=20, r=20, t=50, b=40),
         )
         fig_comparativo.update_yaxes(showgrid=True, gridcolor="#e2e8f0")
+        estilizar_grafico(fig_comparativo)
         st.plotly_chart(fig_comparativo, width="stretch")
 
         # Tabela Consolidada Executiva por Fornecedor

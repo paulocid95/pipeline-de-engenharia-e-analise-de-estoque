@@ -140,7 +140,9 @@ pipeline-analise-estoque-python/
 ├── app.py                                 # Ponto de entrada do painel Streamlit (filtros, KPIs e abas)
 ├── dashboard/                             # Módulos do painel Streamlit
 │   ├── dados.py                           # Conexão com cache, retry e consultas analíticas
-│   ├── estilo.py                          # CSS customizado (cards, banners e abas)
+│   ├── estilo.py                          # CSS do painel (tema claro/escuro, animações e abas em pílula)
+│   ├── componentes.py                     # Cabeçalho de destaque e cartões de indicadores
+│   ├── graficos.py                        # Tema único dos gráficos Plotly e paletas de cores
 │   ├── formatacao.py                      # Moeda em R$ e exportação Excel estilizada
 │   ├── aba_visao_geral.py                 # Aba 1: Visão Geral & Ruptura
 │   ├── aba_fornecedores.py                # Aba 2: Análise de Fornecedores
