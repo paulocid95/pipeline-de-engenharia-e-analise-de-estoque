@@ -26,15 +26,35 @@ def cabecalho(titulo: str, texto: str, conectado: bool, chips: list[str]) -> Non
     )
 
 
+# Partículas de cada efeito de hover (elementos <i> escondidos até a animação começar)
+_PARTICULAS = {
+    "caixa": ["📱", "🎧", "🔌"],    # eletrônicos que entram na caixa
+    "moedas": ["🪙"] * 5,            # moedas caindo ao redor do saco
+    "sirene": [""] * 8,              # raios de luz saindo da sirene
+    "alerta": [],                    # o próprio triângulo cresce e vibra
+}
+
+
+def _icone(icone: str, efeito: str) -> str:
+    particulas = "".join(f'<i class="fx">{p}</i>' for p in _PARTICULAS.get(efeito, []))
+    return (
+        f'<span class="kpi-icone fx-{escape(efeito)}">'
+        f'<span class="kpi-glifo">{escape(icone)}</span>'
+        f'<span class="fx-camada" aria-hidden="true">{particulas}</span>'
+        "</span>"
+    )
+
+
 def cartoes_kpi(cartoes: list[dict]) -> None:
     """Renderiza uma grade responsiva de indicadores.
 
-    Cada cartão é um dicionário com: icone, rotulo, valor, detalhe e tom
-    ("marca", "positivo", "critico" ou "alerta").
+    Cada cartão é um dicionário com: icone, rotulo, valor, detalhe, tom
+    ("marca", "positivo", "critico" ou "alerta") e efeito de hover
+    ("caixa", "moedas", "sirene" ou "alerta").
     """
     blocos = "".join(
         f'<div class="kpi kpi--{escape(c.get("tom", "marca"))}">'
-        f'<div class="kpi-topo"><span class="kpi-icone">{escape(c["icone"])}</span>'
+        f'<div class="kpi-topo">{_icone(c["icone"], c.get("efeito", ""))}'
         f'<span class="kpi-rotulo">{escape(c["rotulo"])}</span></div>'
         f'<div class="kpi-valor">{escape(str(c["valor"]))}</div>'
         f'<div class="kpi-detalhe">{escape(c.get("detalhe", ""))}</div>'

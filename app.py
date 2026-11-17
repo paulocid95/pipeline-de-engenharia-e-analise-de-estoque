@@ -107,22 +107,22 @@ cabecalho(
 
 cartoes_kpi([
     {
-        "icone": "📦", "rotulo": "Volume físico", "tom": "marca",
+        "icone": "📦", "rotulo": "Volume físico", "tom": "marca", "efeito": "caixa",
         "valor": f"{total_itens:,} un".replace(",", "."),
         "detalhe": f"{total_skus} SKUs no filtro atual",
     },
     {
-        "icone": "💰", "rotulo": "Capital imobilizado", "tom": "positivo",
+        "icone": "💰", "rotulo": "Capital imobilizado", "tom": "positivo", "efeito": "moedas",
         "valor": formatar_moeda_brl(valor_total),
         "detalhe": f"Média de {formatar_moeda_brl(valor_medio_sku)} por SKU",
     },
     {
-        "icone": "🚨", "rotulo": "Produtos críticos", "tom": "critico",
+        "icone": "🚨", "rotulo": "Produtos críticos", "tom": "critico", "efeito": "sirene",
         "valor": itens_criticos,
         "detalhe": f"{pct_criticos:.0f}% dos SKUs com estoque zerado",
     },
     {
-        "icone": "⚠️", "rotulo": "Produtos em alerta", "tom": "alerta",
+        "icone": "⚠️", "rotulo": "Produtos em alerta", "tom": "alerta", "efeito": "alerta",
         "valor": itens_alerta,
         "detalhe": f"Com até {LIMITE_ALERTA} unidades em estoque",
     },

@@ -241,6 +241,124 @@ div[data-testid="stChatMessage"] {
 /* Barra lateral */
 section[data-testid="stSidebar"] { border-right: 1px solid var(--borda); }
 
+/* ---------- Efeitos de hover dos ícones dos cartões ----------
+   Cada animação roda uma vez ao passar o mouse e volta sozinha ao estado normal. */
+.kpi-icone { position: relative; }
+.kpi-glifo { display: inline-block; line-height: 1; }
+.fx-camada { position: absolute; inset: 0; pointer-events: none; }
+.fx-camada .fx {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    font-style: normal;
+    font-size: 0.8rem;
+    line-height: 1;
+    opacity: 0;
+    transform: translate(-50%, -50%);
+}
+
+/* Caixa (volume físico): a caixa abre e eletrônicos caem dentro dela */
+@keyframes caixa-abrir {
+    0%   { transform: scale(1); }
+    12%  { transform: scale(1.15, 0.82); }
+    26%  { transform: scale(0.92, 1.18) translateY(-3px); }
+    40%  { transform: scale(1.05, 0.96); }
+    55%  { transform: scale(1.08, 0.92) translateY(1px); }
+    70%  { transform: scale(1.08, 0.92) translateY(1px); }
+    85%  { transform: scale(1.08, 0.92) translateY(1px); }
+    100% { transform: scale(1); }
+}
+@keyframes caixa-item {
+    0%   { opacity: 0; transform: translate(calc(-50% + var(--x)), calc(-50% - 30px)) scale(1); }
+    20%  { opacity: 1; }
+    65%  { opacity: 1; transform: translate(calc(-50% + var(--x) * 0.3), calc(-50% - 4px)) scale(0.85) rotate(var(--r)); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(0.1); }
+}
+.fx-caixa .fx:nth-of-type(1) { --x: -9px; --r: -20deg; }
+.fx-caixa .fx:nth-of-type(2) { --x: 9px;  --r: 18deg; }
+.fx-caixa .fx:nth-of-type(3) { --x: 0px;  --r: 8deg; }
+.kpi:hover .fx-caixa .kpi-glifo { animation: caixa-abrir 1.7s ease-in-out; }
+.kpi:hover .fx-caixa .fx { animation: caixa-item 0.8s ease-in both; }
+.kpi:hover .fx-caixa .fx:nth-of-type(1) { animation-delay: 0.35s; }
+.kpi:hover .fx-caixa .fx:nth-of-type(2) { animation-delay: 0.65s; }
+.kpi:hover .fx-caixa .fx:nth-of-type(3) { animation-delay: 0.95s; }
+
+/* Saco de dinheiro (capital imobilizado): balança e moedas de ouro caem ao redor */
+@keyframes saco-balancar {
+    0%, 100% { transform: rotate(0) scale(1); }
+    15% { transform: rotate(-12deg) scale(1.12); }
+    30% { transform: rotate(10deg) scale(1.12); }
+    45% { transform: rotate(-7deg) scale(1.08); }
+    60% { transform: rotate(4deg) scale(1.04); }
+    75% { transform: rotate(-2deg) scale(1); }
+}
+@keyframes moeda-cair {
+    0%   { opacity: 0; transform: translate(calc(-50% + var(--x)), calc(-50% - 22px)) rotate(0); }
+    15%  { opacity: 1; }
+    75%  { opacity: 1; }
+    100% { opacity: 0; transform: translate(calc(-50% + var(--x)), calc(-50% + 34px)) rotate(var(--r)); }
+}
+.fx-moedas .fx { font-size: 0.72rem; }
+.fx-moedas .fx:nth-of-type(1) { --x: -24px; --r: 300deg; }
+.fx-moedas .fx:nth-of-type(2) { --x: 22px;  --r: -280deg; }
+.fx-moedas .fx:nth-of-type(3) { --x: -12px; --r: 240deg; }
+.fx-moedas .fx:nth-of-type(4) { --x: 14px;  --r: -320deg; }
+.fx-moedas .fx:nth-of-type(5) { --x: 28px;  --r: 360deg; }
+.kpi:hover .fx-moedas .kpi-glifo { animation: saco-balancar 1.2s ease-in-out; }
+.kpi:hover .fx-moedas .fx { animation: moeda-cair 1s cubic-bezier(0.5, 0, 0.9, 0.6) both; }
+.kpi:hover .fx-moedas .fx:nth-of-type(2) { animation-delay: 0.15s; }
+.kpi:hover .fx-moedas .fx:nth-of-type(3) { animation-delay: 0.3s; }
+.kpi:hover .fx-moedas .fx:nth-of-type(4) { animation-delay: 0.45s; }
+.kpi:hover .fx-moedas .fx:nth-of-type(5) { animation-delay: 0.6s; }
+
+/* Sirene (produtos críticos): pisca em vermelho e solta raios de luz */
+@keyframes sirene-piscar {
+    0%, 25%, 50%, 75%, 100% { background: color-mix(in srgb, var(--critico) 18%, transparent); box-shadow: none; }
+    12%, 37%, 62%, 87% { background: color-mix(in srgb, var(--critico) 70%, transparent); box-shadow: 0 0 16px 4px rgba(239, 68, 68, 0.7); }
+}
+@keyframes sirene-glifo {
+    0%, 25%, 50%, 75%, 100% { transform: scale(1); filter: none; }
+    12%, 37%, 62%, 87% { transform: scale(1.18); filter: drop-shadow(0 0 6px #ff3b3b) brightness(1.3); }
+}
+@keyframes sirene-raio {
+    0%   { opacity: 0; transform: translate(-50%, -50%) rotate(var(--a)) translateY(-16px) scaleY(0.3); }
+    35%  { opacity: 1; transform: translate(-50%, -50%) rotate(var(--a)) translateY(-24px) scaleY(1); }
+    100% { opacity: 0; transform: translate(-50%, -50%) rotate(var(--a)) translateY(-31px) scaleY(0.4); }
+}
+.fx-sirene .fx { width: 2px; height: 7px; border-radius: 2px; background: #f87171; box-shadow: 0 0 4px #ef4444; }
+.fx-sirene .fx:nth-of-type(1) { --a: 0deg; }
+.fx-sirene .fx:nth-of-type(2) { --a: 45deg; }
+.fx-sirene .fx:nth-of-type(3) { --a: 90deg; }
+.fx-sirene .fx:nth-of-type(4) { --a: 135deg; }
+.fx-sirene .fx:nth-of-type(5) { --a: 180deg; }
+.fx-sirene .fx:nth-of-type(6) { --a: 225deg; }
+.fx-sirene .fx:nth-of-type(7) { --a: 270deg; }
+.fx-sirene .fx:nth-of-type(8) { --a: 315deg; }
+.kpi:hover .kpi-icone.fx-sirene { animation: sirene-piscar 1.6s linear; }
+.kpi:hover .fx-sirene .kpi-glifo { animation: sirene-glifo 1.6s linear; }
+.kpi:hover .fx-sirene .fx { animation: sirene-raio 0.8s ease-out 2; }
+
+/* Triângulo (produtos em alerta): cresce, vibra e volta ao tamanho normal */
+@keyframes alerta-tremer {
+    0%   { transform: scale(1) rotate(0); }
+    14%  { transform: scale(1.4) rotate(0); }
+    20%  { transform: scale(1.4) rotate(-12deg); }
+    26%  { transform: scale(1.4) rotate(12deg); }
+    32%  { transform: scale(1.4) rotate(-10deg); }
+    38%  { transform: scale(1.4) rotate(10deg); }
+    44%  { transform: scale(1.4) rotate(-7deg); }
+    50%  { transform: scale(1.4) rotate(7deg); }
+    56%  { transform: scale(1.4) rotate(-3deg); }
+    62%  { transform: scale(1.4) rotate(0); }
+    100% { transform: scale(1) rotate(0); }
+}
+@keyframes alerta-brilho {
+    0%, 100% { box-shadow: none; }
+    15%, 60% { box-shadow: 0 0 14px 3px rgba(245, 158, 11, 0.65); }
+}
+.kpi:hover .kpi-icone.fx-alerta { animation: alerta-brilho 1.3s ease-in-out; }
+.kpi:hover .fx-alerta .kpi-glifo { animation: alerta-tremer 1.3s ease-in-out; }
+
 /* Celular e telas estreitas */
 @media (max-width: 640px) {
     .block-container { padding-left: 1rem; padding-right: 1rem; }
