@@ -38,12 +38,13 @@ def orquestrar_pipeline():
 
     # Fluxo ordenado de execução
     etapas = [
-        ("gerar_dados_brutos.py", "Etapa 1/6: Extração/Simulação de Dados Brutos"),
-        ("limpeza_padronizacao.py", "Etapa 2/6: Limpeza e Padronização dos Dados"),
-        ("criar_tabelas.py", "Etapa 3/6: Verificação do Schema e Tabelas DDL"),
-        ("carregar_dados.py", "Etapa 4/6: Carga e Upsert no PostgreSQL (Neon)"),
-        ("gerar_cotacoes_fornecedores.py", "Etapa 5/6: Geração e Carga das Cotações de Fornecedores"),
-        ("consultar_banco.py", "Etapa 6/6: Auditoria e Validação Final do Banco"),
+        ("gerar_dados_brutos.py", "Etapa 1/7: Extração/Simulação de Dados Brutos"),
+        ("limpeza_padronizacao.py", "Etapa 2/7: Limpeza e Padronização dos Dados"),
+        ("criar_tabelas.py", "Etapa 3/7: Verificação do Schema e Tabelas DDL"),
+        ("carregar_dados.py", "Etapa 4/7: Carga e Upsert no PostgreSQL (Neon)"),
+        ("gerar_cotacoes_fornecedores.py", "Etapa 5/7: Geração e Carga das Cotações de Fornecedores"),
+        ("gerar_ocorrencias_fornecedores.py", "Etapa 6/7: Histórico de Ocorrências com Fornecedores"),
+        ("consultar_banco.py", "Etapa 7/7: Auditoria e Validação Final do Banco"),
     ]
 
     for script, descricao in etapas:

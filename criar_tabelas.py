@@ -52,6 +52,25 @@ CREATE TABLE IF NOT EXISTS core.fato_cotacoes (
     data_cotacao TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Tabela Fato: Ocorrências com Fornecedores (histórico de problemas para o ranking de risco)
+CREATE TABLE IF NOT EXISTS core.fato_ocorrencias (
+    id_ocorrencia SERIAL PRIMARY KEY,
+    fornecedor VARCHAR(50) NOT NULL,
+    id_produto INT REFERENCES core.dim_produtos(id_produto) ON DELETE SET NULL,
+    tipo VARCHAR(30) NOT NULL CHECK (tipo IN (
+        'ATRASO', 'DEFEITO', 'ITEM_ERRADO_FALTANDO', 'JUDICIAL',
+        'DIVERGENCIA_PRECO_NF', 'FALHA_ATENDIMENTO', 'AVARIA_TRANSPORTE'
+    )),
+    gravidade VARCHAR(10) NOT NULL CHECK (gravidade IN ('BAIXA', 'MEDIA', 'ALTA', 'CRITICA')),
+    data_ocorrencia DATE NOT NULL,
+    status VARCHAR(15) NOT NULL CHECK (status IN ('RESOLVIDO', 'EM_ANDAMENTO', 'ABERTO')),
+    data_resolucao DATE,
+    descricao VARCHAR(255),
+    -- Só ocorrências resolvidas têm data de resolução, e ela nunca é anterior à ocorrência
+    CHECK ((status = 'RESOLVIDO') = (data_resolucao IS NOT NULL)),
+    CHECK (data_resolucao IS NULL OR data_resolucao >= data_ocorrencia)
+);
+
 -- Criação de índices estratégicos para acelerar consultas e filtros
 CREATE INDEX IF NOT EXISTS idx_fato_data_carga ON core.fato_estoque (data_carga DESC);
 CREATE INDEX IF NOT EXISTS idx_fato_status ON core.fato_estoque (status_reposicao);
@@ -59,6 +78,8 @@ CREATE INDEX IF NOT EXISTS idx_produtos_sku ON core.dim_produtos (sku);
 CREATE INDEX IF NOT EXISTS idx_cotacoes_produto ON core.fato_cotacoes (id_produto);
 CREATE INDEX IF NOT EXISTS idx_cotacoes_fornecedor ON core.fato_cotacoes (fornecedor);
 CREATE INDEX IF NOT EXISTS idx_cotacoes_data ON core.fato_cotacoes (data_cotacao DESC);
+CREATE INDEX IF NOT EXISTS idx_ocorrencias_fornecedor ON core.fato_ocorrencias (fornecedor);
+CREATE INDEX IF NOT EXISTS idx_ocorrencias_data ON core.fato_ocorrencias (data_ocorrencia DESC);
 """
 
 def provisionar_banco():

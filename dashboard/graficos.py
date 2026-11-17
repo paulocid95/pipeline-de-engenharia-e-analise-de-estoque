@@ -10,10 +10,15 @@ CORES_STATUS = {
     "EXCESSO": "#3b82f6",
 }
 
+# Paleta validada (scripts/validate_palette.js) para os modos claro e escuro e para
+# daltonismo. Evita verde e vermelho, reservados às classes Bom e Perigoso.
 CORES_FORNECEDOR = {
-    "Fornecedor A": "#2563eb",
-    "Fornecedor B": "#0d9488",
-    "Fornecedor C": "#f59e0b",
+    "Fornecedor A": "#3987e5",  # azul
+    "Fornecedor B": "#d95926",  # laranja
+    "Fornecedor C": "#199e70",  # verde-água
+    "Fornecedor D": "#c98500",  # âmbar
+    "Fornecedor E": "#d55181",  # magenta
+    "Fornecedor F": "#9085e9",  # violeta
 }
 
 COR_DESTAQUE = "#2563eb"

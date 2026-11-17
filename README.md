@@ -128,10 +128,12 @@ pipeline-analise-estoque-python/
 ├── analise_negocio.py                     # Cálculo de KPIs financeiros e detecção de rupturas
 ├── visualizacao_graficos.py               # Visualização e renderização gráfica executiva
 │
-├── criar_tabelas.py                       # DDL: Provisionamento de schemas, tabelas (incl. core.fato_cotacoes) e constraints SQL
-├── gerar_cotacoes_fornecedores.py         # Simulação e carga de matriz concorrente de cotações
+├── criar_tabelas.py                       # DDL: Provisionamento de schemas, tabelas (incl. cotações e ocorrências) e constraints SQL
+├── gerar_cotacoes_fornecedores.py         # Simulação e carga de matriz concorrente de cotações (6 fornecedores com perfis)
+├── gerar_ocorrencias_fornecedores.py      # Histórico simulado de 12 meses de problemas com fornecedores
 ├── db.py                                  # Conexão centralizada com o PostgreSQL (usada por todos os scripts)
 ├── regras_estoque.py                      # Regras de status de reposição (CRITICO, ALERTA, NORMAL, EXCESSO)
+├── regras_fornecedores.py                 # Nota única, classificação (Bom/Médio/Perigoso) e motivo dos alertas
 ├── carregar_dados.py                      # Ingestão dimensional com Upsert no Neon PostgreSQL
 ├── consultar_banco.py                     # Auditoria pós-carga e consultas SQL analíticas
 ├── pipeline_completo.py                   # Orquestrador mestre automatizado de ponta a ponta
@@ -276,6 +278,17 @@ Foram identificados **8 produtos com estoque zerado**, demandando reposição im
 * **Headphone Bluetooth ANC** (`FA006` - Fornecedor A): Preço Unitário de **R$ 389,00**
 
 
+
+---
+
+## 🛡️ Ranking & Risco de Fornecedores
+
+Além de preço e prazo, o projeto avalia **o histórico de problemas** de cada um dos 6 fornecedores (Fornecedor A a F) para indicar quem é realmente a melhor opção de compra.
+
+* **Histórico de ocorrências (`core.fato_ocorrencias`):** 12 meses simulados de atrasos, itens com defeito ou quebrados, itens errados ou faltando, processos judiciais, divergências de preço ou nota fiscal, falhas de atendimento e avarias no transporte, cada um com gravidade, status (resolvido, em andamento ou em aberto) e tempo de resolução.
+* **Nota única (0 a 100):** combina **preço (30%)**, **prazo (20%)**, **lote mínimo (10%)** e **confiabilidade (40%)**. Preço, prazo e lote são comparados com a melhor oferta de cada produto; a confiabilidade parte de 100 e perde pontos conforme a gravidade de cada problema, quando ele aconteceu (problemas resolvidos perdem metade do peso a cada ~4 meses) e se foi resolvido (resolver rápido pesa pouco; problema em aberto pesa o máximo e piora com o tempo).
+* **Classificação com alertas:** 🟢 **Bom** (75+), 🟡 **Médio** (50 a 74) e 🔴 **Perigoso** (abaixo de 50). Um processo judicial ou problema crítico sem solução classifica como Perigoso direto, seja qual for a nota. Cada alerta traz o motivo principal (ex.: *"Processo judicial em aberto há 44 dias"*).
+* **Regras testadas:** o cálculo fica em `regras_fornecedores.py`, sem acesso ao banco, e é coberto por testes automatizados.
 
 ---
 
@@ -442,7 +455,10 @@ python carregar_dados.py
 # 8. Simular a matriz de cotações dos fornecedores e alimentar o banco de dados
 python gerar_cotacoes_fornecedores.py
 
-# 9. Executar validações e consultas analíticas de auditoria
+# 9. Gerar o histórico de ocorrências com fornecedores (ranking e risco)
+python gerar_ocorrencias_fornecedores.py
+
+# 10. Executar validações, consultas analíticas de auditoria e o ranking de fornecedores
 python consultar_banco.py
 ```
 
