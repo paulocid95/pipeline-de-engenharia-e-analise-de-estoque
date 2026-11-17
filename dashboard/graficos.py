@@ -1,6 +1,7 @@
 """Tema único dos gráficos Plotly e paletas de cores do painel."""
 
 import plotly.graph_objects as go
+import streamlit as st
 
 CORES_STATUS = {
     "CRITICO": "#ef4444",
@@ -32,9 +33,17 @@ def estilizar_grafico(fig: go.Figure) -> go.Figure:
         barcornerradius=8,
         title_font_color=None,
         hoverlabel=dict(font_size=13),
+        # Sem zoom por arraste: no celular o gesto precisa rolar a página, não o gráfico
+        dragmode=False,
     )
-    fig.update_xaxes(gridcolor=_GRADE, zeroline=False, tickfont_color=None)
-    fig.update_yaxes(gridcolor=_GRADE, zeroline=False, tickfont_color=None)
+    fig.update_xaxes(gridcolor=_GRADE, zeroline=False, tickfont_color=None, fixedrange=True, automargin=True)
+    fig.update_yaxes(gridcolor=_GRADE, zeroline=False, tickfont_color=None, fixedrange=True, automargin=True)
     fig.update_traces(marker_line_width=0, selector=dict(type="bar"))
     fig.update_traces(marker_line_width=0, selector=dict(type="pie"))
     return fig
+
+
+def exibir_grafico(fig: go.Figure) -> None:
+    """Aplica o tema e renderiza o gráfico sem a barra de ferramentas do Plotly."""
+    estilizar_grafico(fig)
+    st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})

@@ -6,7 +6,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from dashboard.formatacao import formatar_moeda_brl
-from dashboard.graficos import COR_DESTAQUE, COR_NEUTRA, CORES_STATUS, estilizar_grafico
+from dashboard.graficos import COR_DESTAQUE, COR_NEUTRA, CORES_STATUS, exibir_grafico
 
 
 def renderizar(df_filtrado: pd.DataFrame, valor_total: float) -> None:
@@ -49,15 +49,14 @@ def renderizar(df_filtrado: pd.DataFrame, valor_total: float) -> None:
 
             fig_cat.update_layout(
                 xaxis_title="Montante Retido (R$)",
-                yaxis_title="Categoria",
+                yaxis_title=None,
                 xaxis=dict(showgrid=True, gridcolor="#e2e8f0", range=[0, max_valor_cat * 1.35]),
                 plot_bgcolor="#ffffff",
                 paper_bgcolor="#ffffff",
                 height=380,
-                margin=dict(l=10, r=90, t=20, b=40),
+                margin=dict(l=10, r=20, t=20, b=40),
             )
-            estilizar_grafico(fig_cat)
-            st.plotly_chart(fig_cat, width="stretch")
+            exibir_grafico(fig_cat)
         else:
             st.info("ℹ️ Não há capital imobilizado para os filtros selecionados (Estoque Zerado / R$ 0,00).")
 
@@ -91,8 +90,7 @@ def renderizar(df_filtrado: pd.DataFrame, valor_total: float) -> None:
             fig_status.add_annotation(
                 text=f"<b>{len(df_filtrado)}</b><br>SKUs", showarrow=False, font_size=20,
             )
-            estilizar_grafico(fig_status)
-            st.plotly_chart(fig_status, width="stretch")
+            exibir_grafico(fig_status)
         else:
             st.info("ℹ️ Nenhum dado disponível para os filtros selecionados.")
 

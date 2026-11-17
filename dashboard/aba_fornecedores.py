@@ -6,7 +6,7 @@ import streamlit as st
 from plotly.subplots import make_subplots
 
 from dashboard.formatacao import formatar_moeda_brl
-from dashboard.graficos import estilizar_grafico
+from dashboard.graficos import exibir_grafico
 
 
 def renderizar(df_filtrado: pd.DataFrame) -> None:
@@ -40,7 +40,7 @@ def renderizar(df_filtrado: pd.DataFrame) -> None:
         # Gráfico Comparativo Interativo com Dois Painéis Lado a Lado
         fig_comparativo = make_subplots(
             rows=1, cols=2,
-            subplot_titles=("Volume Físico Total de Peças", "Diversidade de SKUs Ativos"),
+            subplot_titles=("Volume físico (un)", "SKUs ativos"),
             horizontal_spacing=0.12,
         )
 
@@ -80,8 +80,7 @@ def renderizar(df_filtrado: pd.DataFrame) -> None:
             margin=dict(l=20, r=20, t=50, b=40),
         )
         fig_comparativo.update_yaxes(showgrid=True, gridcolor="#e2e8f0")
-        estilizar_grafico(fig_comparativo)
-        st.plotly_chart(fig_comparativo, width="stretch")
+        exibir_grafico(fig_comparativo)
 
         # Tabela Consolidada Executiva por Fornecedor
         st.markdown("##### 📌 Tabela de Participação dos Fornecedores")

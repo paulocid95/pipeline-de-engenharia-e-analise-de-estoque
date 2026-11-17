@@ -5,7 +5,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from dashboard.formatacao import formatar_moeda_brl
-from dashboard.graficos import CORES_FORNECEDOR, estilizar_grafico
+from dashboard.graficos import CORES_FORNECEDOR, exibir_grafico
 
 
 def renderizar(df_cot_filtrado: pd.DataFrame) -> None:
@@ -205,7 +205,7 @@ def renderizar(df_cot_filtrado: pd.DataFrame) -> None:
                     )
                 )
                 fig_prazo.update_layout(
-                    title=dict(text="<b>🚚 Agilidade Logística</b> (Prazo Médio de Entrega)", font=dict(size=14, color="#1e293b")),
+                    title=dict(text="<b>🚚 Agilidade logística</b>", font=dict(size=14, color="#1e293b")),
                     plot_bgcolor="#ffffff",
                     paper_bgcolor="#ffffff",
                     height=260,
@@ -221,8 +221,7 @@ def renderizar(df_cot_filtrado: pd.DataFrame) -> None:
                         tickfont=dict(size=12, color="#0f172a"),
                     ),
                 )
-                estilizar_grafico(fig_prazo)
-                st.plotly_chart(fig_prazo, width="stretch")
+                exibir_grafico(fig_prazo)
 
             with col_g2:
                 # Gráfico 2: Saving Médio (% de Desconto frente à referência)
@@ -243,7 +242,7 @@ def renderizar(df_cot_filtrado: pd.DataFrame) -> None:
                     )
                 )
                 fig_saving.update_layout(
-                    title=dict(text="<b>💰 Competitividade de Custo</b> (Saving Médio vs. Tabela)", font=dict(size=14, color="#1e293b")),
+                    title=dict(text="<b>💰 Competitividade de custo</b>", font=dict(size=14, color="#1e293b")),
                     plot_bgcolor="#ffffff",
                     paper_bgcolor="#ffffff",
                     height=260,
@@ -260,8 +259,7 @@ def renderizar(df_cot_filtrado: pd.DataFrame) -> None:
                         tickfont=dict(size=12, color="#0f172a"),
                     ),
                 )
-                estilizar_grafico(fig_saving)
-                st.plotly_chart(fig_saving, width="stretch")
+                exibir_grafico(fig_saving)
 
             # 4. Quadro Sintético de Decisão de Compra
             st.markdown("###### 📋 Quadro Sintético de Decisão de Compra")

@@ -106,7 +106,7 @@ h1, h2, h3 { letter-spacing: -0.02em !important; font-weight: 700 !important; }
 .kpi-zona { container-type: inline-size; margin-bottom: 22px; }
 .kpi-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
 @container (max-width: 760px) { .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@container (max-width: 380px) { .kpi-grid { grid-template-columns: minmax(0, 1fr); } }
+@container (max-width: 280px) { .kpi-grid { grid-template-columns: minmax(0, 1fr); } }
 .kpi {
     position: relative;
     overflow: hidden;
@@ -144,7 +144,7 @@ h1, h2, h3 { letter-spacing: -0.02em !important; font-weight: 700 !important; }
     background: color-mix(in srgb, var(--tom, var(--marca)) 18%, transparent);
 }
 .kpi-rotulo { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.7; }
-.kpi-valor { font-size: clamp(1.15rem, 12.5cqi, 1.85rem); white-space: nowrap; font-weight: 800; letter-spacing: -0.03em; line-height: 1.1; }
+.kpi-valor { font-size: clamp(1.05rem, 12.5cqi, 1.85rem); white-space: nowrap; font-weight: 800; letter-spacing: -0.03em; line-height: 1.1; }
 .kpi-detalhe { font-size: 0.84rem; opacity: 0.65; margin-top: 6px; }
 
 /* Métricas nativas (usadas dentro das abas) */
@@ -160,6 +160,8 @@ div[data-testid="stMetric"]:hover { transform: translateY(-3px); box-shadow: var
 div[data-testid="stMetric"] label { font-weight: 700; font-size: 0.8rem !important; text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.7; }
 div[data-testid="stMetric"] [data-testid="stMetricLabel"],
 div[data-testid="stMetric"] [data-testid="stMetricLabel"] * { white-space: normal !important; overflow: visible !important; text-overflow: clip !important; }
+div[data-testid="stMetric"] [data-testid="stMetricDelta"],
+div[data-testid="stMetric"] [data-testid="stMetricDelta"] * { white-space: normal !important; overflow: visible !important; text-overflow: clip !important; }
 div[data-testid="stMetric"] [data-testid="stMetricValue"] { font-weight: 800; font-size: 1.5rem !important; letter-spacing: -0.02em; }
 
 /* Banner de introdução de cada aba */
@@ -238,6 +240,45 @@ div[data-testid="stChatMessage"] {
 
 /* Barra lateral */
 section[data-testid="stSidebar"] { border-right: 1px solid var(--borda); }
+
+/* Celular e telas estreitas */
+@media (max-width: 640px) {
+    .block-container { padding-left: 1rem; padding-right: 1rem; }
+    h2 { font-size: 1.35rem !important; }
+    h3 { font-size: 1.15rem !important; }
+    h5 { font-size: 1rem !important; }
+
+    .hero { padding: 22px 18px; border-radius: 16px; margin-bottom: 14px; }
+    .hero-selo { font-size: 0.66rem; }
+    .hero-texto { font-size: 0.9rem; margin-bottom: 14px; }
+    .chip { font-size: 0.74rem; padding: 5px 10px; }
+    .hero-brilho--a { width: 180px; height: 180px; }
+    .hero-brilho--b { display: none; }
+
+    .kpi-grid { gap: 10px; }
+    .kpi { padding: 14px 14px; border-radius: 14px; }
+    .kpi-topo { gap: 8px; margin-bottom: 8px; }
+    .kpi-icone { width: 30px; height: 30px; font-size: 0.95rem; border-radius: 8px; }
+    .kpi-rotulo { font-size: 0.66rem; letter-spacing: 0.04em; }
+    .kpi-detalhe { font-size: 0.74rem; }
+
+    .tab-banner { font-size: 0.88rem; padding: 11px 14px; margin-bottom: 16px; }
+    .stTabs [role="tab"] { padding: 7px 12px; font-size: 0.88rem; }
+
+    /* Métricas nativas: duas por linha em vez de uma */
+    div[data-testid="stHorizontalBlock"]:has(div[data-testid="stMetric"]) { flex-wrap: wrap; gap: 10px; }
+    div[data-testid="stHorizontalBlock"]:has(div[data-testid="stMetric"]) > div[data-testid="stColumn"] {
+        min-width: calc(50% - 5px) !important;
+        flex: 1 1 calc(50% - 5px) !important;
+        width: calc(50% - 5px) !important;
+    }
+    div[data-testid="stMetric"] { padding: 12px 14px; }
+    div[data-testid="stMetric"] label { font-size: 0.68rem !important; }
+    div[data-testid="stMetric"] [data-testid="stMetricValue"] { font-size: 1.2rem !important; }
+
+    /* Alvos de toque confortáveis */
+    .stButton button, .stDownloadButton button { min-height: 44px; }
+}
 
 /* Respeita quem prefere menos movimento */
 @media (prefers-reduced-motion: reduce) {
