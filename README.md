@@ -94,7 +94,7 @@ O pipeline segue um fluxo lógico desacoplado e modular com arquitetura ponta a 
 | **Banco de Dados (Cloud)** | **Neon PostgreSQL (Cloud)** | Data Warehouse relacional serverless em nuvem com modelagem dimensional (*Star Schema*) |
 | **Conectividade & ORM** | SQLAlchemy, psycopg2-binary | Gerenciamento de engine, pool de conexões e execução transacional segura |
 | **Inteligência Artificial (GenAI)** | **Google Gemini (3.8 Flash)**, `google-genai` | Assistente virtual de suprimentos, recomendação multicritério de compras e resiliência em cascata |
-| **Dashboard & Visualização Interativa** | Streamlit, Plotly Express | Aplicação analítica com filtros dinâmicos, métricas executivas, 5 abas e gráficos interativos |
+| **Dashboard & Visualização Interativa** | Streamlit, Plotly Express | Aplicação analítica com filtros dinâmicos, métricas executivas, 6 abas e gráficos interativos |
 | **Deploy & Hospedagem em Nuvem** | **Streamlit Community Cloud** | Hospedagem contínua, CI/CD integrado ao GitHub e disponibilização pública da aplicação |
 | **Visualização Executiva** | Matplotlib, Seaborn | Geração de gráficos estáticos em alta resolução (300 DPI) para relatórios |
 | **Configuração & Controle de Versão** | python-dotenv, Git, GitHub | Gestão segura de variáveis de ambiente (`.env`, `secrets.toml`) e controle de versão |
@@ -149,7 +149,8 @@ pipeline-analise-estoque-python/
 │   ├── aba_visao_geral.py                 # Aba 1: Visão Geral & Ruptura
 │   ├── aba_fornecedores.py                # Aba 2: Análise de Fornecedores
 │   ├── aba_compras.py                     # Aba 3: Inteligência de Compras & Cotações
-│   └── aba_tabela.py                      # Aba 4: Tabela Operacional & Exportação
+│   ├── aba_ranking.py                     # Aba 4: Ranking & Risco de Fornecedores
+│   └── aba_tabela.py                      # Aba 5: Tabela Operacional & Exportação
 │
 ├── requirements.txt                       # Dependências do ambiente Python com versões fixadas
 ├── requirements-dev.txt                   # Dependências de desenvolvimento (pytest)
@@ -328,7 +329,7 @@ Toda a integração com a IA foi construída seguindo as melhores práticas de e
 
 ## 📈 Demonstração e Visualização
 
-A camada de visualização do projeto é composta por duas frentes complementares: um **dashboard interativo em nuvem** estruturado em 5 abas analíticas para suporte à decisão em tempo real e um conjunto de **gráficos executivos estáticos** para relatórios gerenciais de alta resolução.
+A camada de visualização do projeto é composta por duas frentes complementares: um **dashboard interativo em nuvem** estruturado em 6 abas analíticas para suporte à decisão em tempo real e um conjunto de **gráficos executivos estáticos** para relatórios gerenciais de alta resolução.
 
 ---
 
@@ -347,8 +348,9 @@ A aplicação web interativa foi implantada em produção no **Streamlit Communi
   1. **📊 Visão Geral & Ruptura:** Scorecards de KPIs em tempo real (Total de SKUs, Volume Físico, Capital Imobilizado, Produtos Críticos e Itens em Alerta), gráfico de barras horizontais de capital retido por categoria (Plotly) e gráfico de rosca de distribuição do status de reposição (*CRÍTICO*, *ALERTA*, *NORMAL*, *EXCESSO*).
   2. **🏭 Análise de Fornecedores:** Indicadores de concentração de suprimentos, share de volume físico e capital imobilizado por parceiro comercial e matriz comparativa de dependência operacional.
   3. **💡 Inteligência de Compras:** Painel de *Procurement Analytics* com auditoria de propostas concorrentes, identificação de savings potenciais e otimização da relação custo unitário vs. prazo de entrega.
-  4. **📋 Tabela Operacional & Exportação:** Visualização detalhada em tabela interativa com badges visuais de status, formatação monetária padrão BRL (R$) e botão de exportação imediata dos dados filtrados para formato `.csv` (Excel).
-  5. **🤖 Assistente IA & Compras:** Interface conversacional com o **Google Gemini**, municiada com o contexto do banco de dados em tempo real, streaming de respostas, botões de consulta rápida e recomendações multicritério de aquisição.
+  4. **🛡️ Ranking & Risco:** Cartões de alerta por fornecedor (🟢 Bom, 🟡 Médio, 🔴 Perigoso) com nota e motivo principal, ranking com a nota de cada fator, mapa de calor dos problemas por tipo, tempo médio de resolução e histórico de ocorrências com filtros.
+  5. **📋 Tabela Operacional & Exportação:** Visualização detalhada em tabela interativa com badges visuais de status, formatação monetária padrão BRL (R$) e botão de exportação imediata dos dados filtrados para formato `.csv` (Excel).
+  6. **🤖 Assistente IA & Compras:** Interface conversacional com o **Google Gemini**, municiada com o contexto do banco de dados em tempo real, streaming de respostas, botões de consulta rápida e recomendações multicritério de aquisição.
 
 ---
 

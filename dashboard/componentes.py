@@ -62,3 +62,35 @@ def cartoes_kpi(cartoes: list[dict]) -> None:
         for c in cartoes
     )
     st.markdown(f'<div class="kpi-zona"><div class="kpi-grid">{blocos}</div></div>', unsafe_allow_html=True)
+
+
+def cartoes_fornecedores(ranking) -> None:
+    """Cartões de alerta, um por fornecedor, na ordem do ranking.
+
+    `ranking` vem de regras_fornecedores.ranking_fornecedores.
+    """
+    from dashboard.graficos import CORES_FORNECEDOR
+    from regras_fornecedores import ICONE_CLASSE, ROTULO_CLASSE
+
+    blocos = []
+    for posicao, linha in enumerate(ranking.itertuples(), start=1):
+        classe = str(linha.classe).lower()
+        nota = float(linha.nota_final)
+        cor = CORES_FORNECEDOR.get(linha.fornecedor, "#64748b")
+        sem_solucao = int(linha.sem_solucao)
+        meta = f"#{posicao} no ranking · {int(linha.ocorrencias_12m)} ocorrências em 12 meses"
+        if sem_solucao:
+            meta += f" · {sem_solucao} sem solução"
+        blocos.append(
+            f'<div class="forn forn--{escape(classe)}">'
+            '<div class="forn-topo">'
+            f'<span class="forn-nome"><i class="forn-cor" style="background:{escape(cor)}"></i>{escape(linha.fornecedor)}</span>'
+            f'<span class="forn-selo">{ICONE_CLASSE[linha.classe]} {escape(ROTULO_CLASSE[linha.classe])}</span>'
+            "</div>"
+            f'<div class="forn-nota"><span class="forn-nota-valor">{nota:.0f}</span><span class="forn-nota-max">/100</span></div>'
+            f'<div class="forn-barra" role="img" aria-label="Nota {nota:.0f} de 100"><span style="width:{nota:.0f}%"></span></div>'
+            f'<div class="forn-motivo">{escape(linha.motivo)}</div>'
+            f'<div class="forn-meta">{escape(meta)}</div>'
+            "</div>"
+        )
+    st.markdown(f'<div class="forn-zona"><div class="forn-grid">{"".join(blocos)}</div></div>', unsafe_allow_html=True)

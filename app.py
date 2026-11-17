@@ -8,8 +8,13 @@ import pandas as pd
 import streamlit as st
 
 from assistente_estoque import renderizar_interface_chat
-from dashboard import aba_compras, aba_fornecedores, aba_tabela, aba_visao_geral
-from dashboard.dados import carregar_dados_analiticos, carregar_dados_cotacoes, obter_conexao
+from dashboard import aba_compras, aba_fornecedores, aba_ranking, aba_tabela, aba_visao_geral
+from dashboard.dados import (
+    carregar_dados_analiticos,
+    carregar_dados_cotacoes,
+    carregar_ocorrencias,
+    obter_conexao,
+)
 from dashboard.estilo import aplicar_estilo
 from dashboard.componentes import cabecalho, cartoes_kpi
 from dashboard.formatacao import formatar_moeda_brl
@@ -132,10 +137,11 @@ cartoes_kpi([
 # ==============================================================================
 # 4. ESTRUTURA MODULAR EM ABAS (st.tabs)
 # ==============================================================================
-tab_visao_geral, tab_fornecedores, tab_compras, tab_tabela, tab_assistente = st.tabs([
+tab_visao_geral, tab_fornecedores, tab_compras, tab_ranking, tab_tabela, tab_assistente = st.tabs([
     "📊 Visão Geral & Ruptura",
     "🏭 Análise de Fornecedores",
     "💡 Inteligência de Compras",
+    "🛡️ Ranking & Risco",
     "📋 Tabela Operacional & Exportação",
     "🤖 Assistente IA & Compras",
 ])
@@ -149,6 +155,9 @@ with tab_fornecedores:
 
 with tab_compras:
     aba_compras.renderizar(df_cot_filtrado)
+
+with tab_ranking:
+    aba_ranking.renderizar(df_cot, carregar_ocorrencias())
 
 with tab_tabela:
     aba_tabela.renderizar(df_filtrado)

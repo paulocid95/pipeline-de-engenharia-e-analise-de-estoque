@@ -36,6 +36,7 @@ ROTULOS_TIPO = {
     "AVARIA_TRANSPORTE": "Avaria no transporte",
 }
 ROTULOS_STATUS = {"RESOLVIDO": "Resolvido", "EM_ANDAMENTO": "Em andamento", "ABERTO": "Em aberto"}
+ROTULOS_GRAVIDADE = {"BAIXA": "Baixa", "MEDIA": "Média", "ALTA": "Alta", "CRITICA": "Crítica"}
 
 ROTULO_CLASSE = {"BOM": "Bom", "MEDIO": "Médio", "PERIGOSO": "Perigoso"}
 ICONE_CLASSE = {"BOM": "🟢", "MEDIO": "🟡", "PERIGOSO": "🔴"}

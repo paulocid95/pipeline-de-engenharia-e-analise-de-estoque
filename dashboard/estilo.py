@@ -359,6 +359,50 @@ section[data-testid="stSidebar"] { border-right: 1px solid var(--borda); }
 .kpi:hover .kpi-icone.fx-alerta { animation: alerta-brilho 1.3s ease-in-out; }
 .kpi:hover .fx-alerta .kpi-glifo { animation: alerta-tremer 1.3s ease-in-out; }
 
+/* ---------- Cartões de alerta dos fornecedores (aba Ranking & Risco) ---------- */
+.forn-zona { container-type: inline-size; margin-bottom: 24px; }
+.forn-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+@container (max-width: 820px) { .forn-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@container (max-width: 480px) { .forn-grid { grid-template-columns: minmax(0, 1fr); } }
+.forn {
+    --classe: var(--alerta);
+    position: relative;
+    border-radius: 16px;
+    padding: 16px 18px;
+    background: var(--superficie);
+    border: 1px solid var(--borda);
+    border-top: 4px solid var(--classe);
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+    animation: surgir 0.5s ease both;
+}
+.forn:hover { transform: translateY(-3px); box-shadow: var(--sombra); }
+.forn--bom      { --classe: var(--positivo); }
+.forn--medio    { --classe: var(--alerta); }
+.forn--perigoso { --classe: var(--critico); animation: surgir 0.5s ease both, perigo 1.6s ease-in-out 0.5s 3; }
+@keyframes perigo {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+    50%      { box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.35); }
+}
+.forn-topo { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.forn-nome { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; }
+.forn-cor { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.forn-selo {
+    font-size: 0.78rem;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 999px;
+    white-space: nowrap;
+    background: color-mix(in srgb, var(--classe) 16%, transparent);
+    border: 1px solid color-mix(in srgb, var(--classe) 45%, transparent);
+}
+.forn-nota { display: flex; align-items: baseline; gap: 4px; }
+.forn-nota-valor { font-size: 2rem; font-weight: 800; letter-spacing: -0.03em; line-height: 1; }
+.forn-nota-max { font-size: 0.85rem; opacity: 0.6; }
+.forn-barra { height: 6px; border-radius: 999px; background: var(--superficie-forte); margin: 10px 0 12px; overflow: hidden; }
+.forn-barra span { display: block; height: 100%; border-radius: 999px; background: var(--classe); }
+.forn-motivo { font-size: 0.88rem; line-height: 1.4; min-height: 2.5em; }
+.forn-meta { font-size: 0.76rem; opacity: 0.6; margin-top: 8px; }
+
 /* Celular e telas estreitas */
 @media (max-width: 640px) {
     .block-container { padding-left: 1rem; padding-right: 1rem; }

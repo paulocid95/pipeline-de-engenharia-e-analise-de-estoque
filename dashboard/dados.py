@@ -170,3 +170,30 @@ def carregar_dados_cotacoes() -> pd.DataFrame:
             "fornecedor_cotacao", "preco_cotado", "lote_minimo", "prazo_dias",
             "data_cotacao", "status_reposicao", "quantidade_disponivel"
         ])
+
+
+@st.cache_data(ttl=300)
+def carregar_ocorrencias() -> pd.DataFrame:
+    """Histórico de ocorrências com fornecedores (vazio se a tabela ainda não foi gerada)."""
+    query = """
+        SELECT
+            o.id_ocorrencia,
+            o.fornecedor,
+            p.nome_produto,
+            o.tipo,
+            o.gravidade,
+            o.data_ocorrencia,
+            o.status,
+            o.data_resolucao,
+            o.descricao
+        FROM core.fato_ocorrencias o
+        LEFT JOIN core.dim_produtos p ON o.id_produto = p.id_produto
+        ORDER BY o.data_ocorrencia DESC;
+    """
+    try:
+        return executar_query_com_retry(query)
+    except Exception:
+        return pd.DataFrame(columns=[
+            "id_ocorrencia", "fornecedor", "nome_produto", "tipo", "gravidade",
+            "data_ocorrencia", "status", "data_resolucao", "descricao",
+        ])
