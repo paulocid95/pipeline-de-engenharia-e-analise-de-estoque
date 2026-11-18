@@ -14,11 +14,14 @@
 ![Plotly](https://img.shields.io/badge/Plotly-Express-3F4F75?logo=plotly&logoColor=white)
 ![Matplotlib](https://img.shields.io/badge/Matplotlib-3.8%2B-informational?logo=python&logoColor=white)
 ![Seaborn](https://img.shields.io/badge/Seaborn-0.13%2B-blueviolet)
+![Pytest](https://img.shields.io/badge/Testes-pytest-0A9EDC?logo=pytest&logoColor=white)
 ![Git](https://img.shields.io/badge/Git-VCS-F05032?logo=git&logoColor=white)
 ![Status](https://img.shields.io/badge/Status-Concluído-success)
 [![License](https://img.shields.io/badge/Licença-MIT-green)](LICENSE)
 
 Solução modular e automatizada de **Engenharia e Análise de Dados** ponta a ponta desenvolvida em **Python** e **Pandas**, com persistência relacional no **Neon PostgreSQL (Cloud)** com **SQLAlchemy**, orquestração completa do pipeline de ETL, geração de relatórios executivos e disponibilização de um dashboard interativo em tempo real hospedado no **Streamlit Community Cloud**. A plataforma conta agora com um **Assistente Virtual de Suprimentos e Compras com IA Generativa (Google Gemini)** integrado diretamente à base em tempo real, permitindo aos gestores consultar diagnósticos operacionais, recomendações multicritério de cotações de fornecedores e planos de mitigação de rupturas de estoque com streaming nativo e respostas ancoradas nos dados reais do banco. O sistema realiza data profiling, higienização, mapeamento para schema canônico, carga em **Star Schema**, cálculo de indicadores financeiros e auditoria preditiva a partir de fontes de múltiplos fornecedores.
+
+Além disso, um **ranking de risco de fornecedores** avalia cada parceiro por preço, prazo, lote mínimo e **histórico de problemas** (atrasos, defeitos, itens errados, processos judiciais e mais), classificando-os como 🟢 Bom, 🟡 Médio ou 🔴 Perigoso. Essa nota orienta o simulador de recompra e o assistente de IA, sempre mostrando as alternativas para que o usuário tome a decisão final. Tudo em um painel moderno, com tema claro/escuro e versão adaptada para celular.
 
 
 
@@ -51,6 +54,8 @@ Neste projeto, três fornecedores distintos (**Fornecedor A, Fornecedor B e Forn
 
 **Objetivo:** Construir um pipeline resiliente e auditável em Python que converta arquivos heterogêneos e inconsistentes em uma base única e fidedigna (Single Source of Truth), alimente um banco relacional em nuvem (PostgreSQL / Neon) sob modelagem dimensional e disponibilize camadas visuais de consumo analítico para suporte à decisão.
 
+Na etapa de compras, o projeto simula um mercado com **6 fornecedores (A a F)**, cada um com perfil comercial e histórico de ocorrências próprios, para responder à pergunta que importa na reposição: *qual fornecedor é realmente a melhor escolha, considerando preço, prazo, lote e risco?*
+
 
 
 ---
@@ -79,12 +84,19 @@ O pipeline segue um fluxo lógico desacoplado e modular com arquitetura ponta a 
        │
        ├──▶ [visualizacao_graficos.py] ──▶ [graficos/*.png] (Gráficos Executivos 300 DPI)
        │
-       └──▶ [carregar_dados.py] ──▶ [Neon PostgreSQL (Cloud)]
-                                            │
-                                            ▼ (SQLAlchemy / Context Injection)
+       └──▶ [criar_tabelas.py] ──▶ [carregar_dados.py] ──▶ [Neon PostgreSQL (Cloud)]
+                                                                   ▲
+            [gerar_cotacoes_fornecedores.py] (6 fornecedores) ─────┤
+            [gerar_ocorrencias_fornecedores.py] (12 meses) ────────┘
+                                                                   │
+                       [regras_fornecedores.py] (nota, classe e alternativas)
+                                                                   │
+                                                                   ▼ (SQLAlchemy / Context Injection)
                                   [Streamlit Community Cloud] ◀──▶ [Google Gemini API]
                                   (estoque-dashboard-live.streamlit.app)   (GenAI / SDK google-genai)
 ```
+
+Todas as etapas acima são executadas em sequência pelo orquestrador `pipeline_completo.py`.
 
 ### 🛠️ Tecnologias Utilizadas e Nuvem
 
@@ -94,10 +106,11 @@ O pipeline segue um fluxo lógico desacoplado e modular com arquitetura ponta a 
 | **Banco de Dados (Cloud)** | **Neon PostgreSQL (Cloud)** | Data Warehouse relacional serverless em nuvem com modelagem dimensional (*Star Schema*) |
 | **Conectividade & ORM** | SQLAlchemy, psycopg2-binary | Gerenciamento de engine, pool de conexões e execução transacional segura |
 | **Inteligência Artificial (GenAI)** | **Google Gemini (3.8 Flash)**, `google-genai` | Assistente virtual de suprimentos, recomendação multicritério de compras e resiliência em cascata |
-| **Dashboard & Visualização Interativa** | Streamlit, Plotly Express | Aplicação analítica com filtros dinâmicos, métricas executivas, 6 abas e gráficos interativos |
+| **Dashboard & Visualização Interativa** | Streamlit, Plotly, CSS customizado | Aplicação analítica com 6 abas, filtros dinâmicos, tema claro/escuro, animações e layout responsivo para celular |
 | **Deploy & Hospedagem em Nuvem** | **Streamlit Community Cloud** | Hospedagem contínua, CI/CD integrado ao GitHub e disponibilização pública da aplicação |
 | **Visualização Executiva** | Matplotlib, Seaborn | Geração de gráficos estáticos em alta resolução (300 DPI) para relatórios |
 | **Configuração & Controle de Versão** | python-dotenv, Git, GitHub | Gestão segura de variáveis de ambiente (`.env`, `secrets.toml`) e controle de versão |
+| **Qualidade & Testes** | pytest | 69 testes automatizados cobrindo limpeza de dados, regras de estoque, ranking de fornecedores e limite do assistente |
 
 ### Estrutura do Diretório do Projeto:
 
@@ -143,7 +156,7 @@ pipeline-analise-estoque-python/
 ├── dashboard/                             # Módulos do painel Streamlit
 │   ├── dados.py                           # Conexão com cache, retry e consultas analíticas
 │   ├── estilo.py                          # CSS do painel (tema claro/escuro, animações e abas em pílula)
-│   ├── componentes.py                     # Cabeçalho de destaque e cartões de indicadores
+│   ├── componentes.py                     # Cabeçalho de destaque, cartões de indicadores animados e cartões de alerta dos fornecedores
 │   ├── graficos.py                        # Tema único dos gráficos Plotly e paletas de cores
 │   ├── formatacao.py                      # Moeda em R$ e exportação Excel estilizada
 │   ├── aba_visao_geral.py                 # Aba 1: Visão Geral & Ruptura
@@ -155,7 +168,7 @@ pipeline-analise-estoque-python/
 ├── requirements.txt                       # Dependências do ambiente Python com versões fixadas
 ├── requirements-dev.txt                   # Dependências de desenvolvimento (pytest)
 ├── pytest.ini                             # Configuração dos testes automatizados
-├── tests/                                 # Testes da limpeza de dados e das regras de estoque
+├── tests/                                 # Testes da limpeza, das regras de estoque, do ranking de fornecedores e do limite do assistente
 ├── LICENSE                                # Licença MIT
 ├── .env                                   # Variáveis de ambiente e credenciais (DATABASE_URL, GEMINI_API_KEY)
 ├── .gitignore                             # Regras de exclusão do Git
@@ -210,13 +223,14 @@ pipeline-analise-estoque-python/
 
 5. **Modelagem Dimensional e Armazenamento (PostgreSQL / Neon):**
    * Isolamento lógico em schema dedicado (`core`) para governança analítica.
-   * Arquitetura em *Star Schema* composta por tabelas de dimensões (`core.dim_categorias`, `core.dim_produtos`) e tabela de fatos (`core.fato_estoque`).
-   * Aplicação de regras de integridade defensiva via `CHECK constraints` (`preco_unitario >= 0`, `quantidade_disponivel >= 0`) e garantia de idempotência através de operações de *Upsert* (`ON CONFLICT (sku) DO UPDATE`).
+   * Arquitetura em *Star Schema* composta por tabelas de dimensões (`core.dim_categorias`, `core.dim_produtos`) e tabelas de fatos: `core.fato_estoque` (retratos do estoque), `core.fato_cotacoes` (propostas dos fornecedores) e `core.fato_ocorrencias` (histórico de problemas com fornecedores).
+   * Aplicação de regras de integridade defensiva via `CHECK constraints` (`preco_unitario >= 0`, `quantidade_disponivel >= 0`, tipos e status válidos de ocorrência, data de resolução obrigatória só para ocorrências resolvidas) e garantia de idempotência através de operações de *Upsert* (`ON CONFLICT (sku) DO UPDATE`).
+   * Conexão centralizada em `db.py`, usada por todos os scripts, e regras de negócio isoladas em módulos sem acesso ao banco (`regras_estoque.py`, `regras_fornecedores.py`), o que permite testá-las automaticamente.
 
 
 
 6. **Orquestração Automatizada com Logging Estruturado:**
-   * Script centralizador (`pipeline_completo.py`) responsável pelo encadeamento sequencial de todas as fases, desde a simulação de origem até a carga relacional e auditoria.
+   * Script centralizador (`pipeline_completo.py`) responsável pelo encadeamento sequencial das 7 fases: simulação dos dados brutos, limpeza, criação das tabelas, carga, cotações, histórico de ocorrências e auditoria final com o ranking de fornecedores.
    * Gestão de execução com métricas de tempo por módulo, rastreamento de falhas com aborto controlado e geração de logs em níveis `INFO` e `ERROR`.
 
 
@@ -303,14 +317,16 @@ O projeto integra um assistente inteligente de ponta a ponta (`assistente_estoqu
 Diferente de chatbots genéricos desconectados do ecossistema de dados, o assistente utiliza **injeção de contexto em tempo real** diretamente do Data Warehouse (**Neon PostgreSQL / Schema `core`**):
 * **Extração Dinâmica de Estado:** A cada consulta, a função `extrair_contexto_executivo_estoque()` consulta a visão unificada do estoque (`core.fato_estoque`, `core.dim_produtos`, `core.dim_categorias`), mapeando SKUs críticos (`quantidade_disponivel = 0`), itens em alerta de ressuprimento (`quantidade_disponivel <= estoque_minimo`) e capital imobilizado.
 * **Matriz de Cotações Concorrentes:** Extrai a tabela fato de compras (`core.fato_cotacoes`), identificando para cada SKU a precificação unitária de múltiplos fornecedores, prazos de entrega (*Lead Time* em dias corridos) e lotes mínimos exigidos (*MOQ*).
+* **Ranking e Risco de Fornecedores:** Recebe a classe (🟢 Bom, 🟡 Médio, 🔴 Perigoso), a nota e o motivo principal de cada fornecedor, além da **melhor opção geral** de cada produto e das alternativas (mais barata, mais rápida, menor lote) com o motivo de não terem vencido. É calculado pelas mesmas regras do painel (`regras_fornecedores.py`).
 * **System Instruction Especializado:** O contexto operacional higienizado é incorporado diretamente nas instruções do sistema (`system_instruction`), garantindo conformidade analítica estrita, vocabulário corporativo de suprimentos (PT-BR) e instrução explícita para não inventar SKUs, preços ou cotações que não estejam no contexto.
-* **Tabelas Markdown Mandatórias:** O assistente formata recomendações de reposição prioritariamente em tabelas estruturadas contendo: `Produto Crítico`, `Fornecedor Recomendado`, `Preço Cotado (R$)`, `Prazo de Entrega (dias)` e `Justificativa da Escolha`.
+* **Tabelas Markdown Mandatórias:** O assistente formata recomendações de reposição prioritariamente em tabelas estruturadas contendo: `Produto Crítico`, `Fornecedor Recomendado`, `Classificação`, `Preço Cotado (R$)`, `Prazo de Entrega (dias)` e `Justificativa da Escolha`.
 
 ### 2. 🎯 Apoio à Decisão de Suprimentos & Procurement Multicritério
-O assistente foi desenhado para resolver o trade-off clássico de supply chain: **Preço vs. Prazo vs. Capital de Giro**:
-* **Foco em Custo & Saving:** Quando a demanda permite planejamento, a IA prioriza fornecedores com o menor preço unitário cotado, calculando a economia gerada em relação aos demais parceiros.
-* **Foco em Urgência & Ruptura Crítica:** Em situações de estoque zerado de alto ticket (ex.: *Samsung Galaxy S24 Ultra* ou *Xiaomi Redmi Note 13*), a IA prioriza o fornecedor com menor *Lead Time* (prazo de entrega em dias corridos), explicitando o impacto de restabelecer o faturamento com urgência.
-* **Equilíbrio Custo-Benefício:** Ponderação automática entre preço cotado e volume exigido pelo lote mínimo, evitando a imobilização excessiva de caixa em itens de menor rotação.
+O assistente foi desenhado para resolver o trade-off clássico de supply chain: **Preço vs. Prazo vs. Capital de Giro vs. Risco do Fornecedor**:
+* **Melhor Opção Geral por Padrão:** A IA recomenda o fornecedor com a melhor nota combinada (preço, prazo, lote mínimo e confiabilidade) e mostra a classificação dele em cada recomendação.
+* **Proteção contra Fornecedores de Risco:** Um fornecedor 🔴 Perigoso nunca é recomendado como opção principal. Quando ele é o mais barato ou o mais rápido, a IA o cita como alternativa, com aviso e motivo (ex.: *"R$ 11,25 mais barato, mas com processo judicial em aberto"*).
+* **Foco em Custo ou Urgência:** Quando a pergunta prioriza menor preço ou reposição imediata, a IA destaca a alternativa mais barata ou mais rápida, sempre comparando com a melhor opção geral e explicitando o risco.
+* **Decisão Final do Usuário:** Após a tabela, a IA lista as alternativas com a diferença de preço, prazo ou lote e o motivo de não terem vencido.
 * **Chips de Consulta Rápida:** A interface conta com botões de atalho analítico de um clique para perguntas de alta relevância gerencial:
   * `🚨 Produtos Críticos Hoje`: Diagnóstico imediato de rupturas e recomendações de recompra prioritárias.
   * `⏱️ Fornecedores Mais Ágeis`: Mapeamento de menor *Lead Time* por produto para operações de emergência.
@@ -321,11 +337,12 @@ Toda a integração com a IA foi construída seguindo as melhores práticas de e
 * **SDK Oficial `google-genai`:** Utiliza o SDK moderno de última geração do Google (`from google import genai`), com configurações otimizadas de inferência (`temperature=0.2`, `max_output_tokens=3500`).
 * **Failover em Cascata Inteligente (Zero Downtime):** Para assegurar disponibilidade contínua mesmo sob exaustão de cotas gratuitas (código HTTP `429`) ou sobrecarga momentânea dos servidores (código HTTP `503`), o sistema implementa uma cascata prioritária automática:
   $$\text{gemini-3.8-flash} \longrightarrow \text{gemini-3.5-flash} \longrightarrow \text{gemini-flash-lite-latest} \longrightarrow \text{gemini-flash-latest}$$
-* **Retry com Backoff Exponencial:** Mecanismo integrado de retentativas automáticas (`max_retries=3`) com pausa adaptativa para absorção de instabilidades de rede transitórias.
+* **Tempo Limite por Modelo:** Cada modelo da cascata recebe uma única tentativa com tempo limite de 30 s; se travar ou estiver sobrecarregado, a vez passa ao próximo modelo, sem prender o usuário por minutos.
 * **Cache de Dados Analíticos (`@st.cache_data`):** A leitura das tabelas no banco de dados é cacheada com `ttl=60`, garantindo agilidade milissegunda na geração do contexto sem onerar a base relacional com queries redundantes.
 * **Streaming Fluido & Atômico:** O processamento gera respostas completas sem truncamento ou quebra de frases, sendo entregue ao usuário via streaming nativo do Streamlit (`st.write_stream`).
 * **Gestão Transparente de Credenciais:** Suporte nativo a credenciais tanto via `.env` (desenvolvimento local) quanto via `st.secrets` (`.streamlit/secrets.toml` ou painel do Streamlit Community Cloud), com verificação de status em tempo real exibida na interface.
-* **Proteção de Cota da API:** Limite de 10 perguntas por sessão, intervalo mínimo de 5 segundos entre envios e no máximo uma tentativa por modelo da cascata (com tempo limite de 30 s), evitando consumo excessivo da API em uma demonstração pública.
+* **Proteção de Cota da API:** Limite de 10 perguntas por sessão (com contador visível), intervalo mínimo de 5 segundos entre envios e no máximo uma tentativa por modelo da cascata, evitando consumo excessivo da API em uma demonstração pública.
+* **Erros sem Exposição de Dados:** Detalhes técnicos de falhas (banco ou API) vão apenas para o log do servidor; o visitante vê só uma mensagem amigável.
 
 ---
 
@@ -345,14 +362,19 @@ A aplicação web interativa foi implantada em produção no **Streamlit Communi
 
 * **Integração em Nuvem com SQLAlchemy:** O painel estabelece conexão gerenciada com o banco Neon via `create_engine` e gerencia o ciclo de vida da conexão através do decorador `@st.cache_resource`.
 * **Consultas Analíticas Otimizadas:** As métricas são consultadas na tabela fato (`core.fato_estoque`) com junção nas dimensões de produtos (`core.dim_produtos`) e categorias (`core.dim_categorias`), utilizando a sintaxe `DISTINCT ON (p.sku)` ordenada pela carga mais recente (`data_carga DESC`).
-* **Cache Inteligente de Baixa Latência:** O carregamento dos dados utiliza `@st.cache_data(ttl=60)`, assegurando tempo de resposta instantâneo aos usuários simultâneos sem sobrecarregar a infraestrutura do banco.
-* **Estrutura Modular em 5 Abas Analíticas:**
-  1. **📊 Visão Geral & Ruptura:** Scorecards de KPIs em tempo real (Total de SKUs, Volume Físico, Capital Imobilizado, Produtos Críticos e Itens em Alerta), gráfico de barras horizontais de capital retido por categoria (Plotly) e gráfico de rosca de distribuição do status de reposição (*CRÍTICO*, *ALERTA*, *NORMAL*, *EXCESSO*).
+* **Cache Inteligente de Baixa Latência:** O carregamento dos dados utiliza `@st.cache_data(ttl=300)` (5 minutos), assegurando tempo de resposta instantâneo aos usuários simultâneos sem sobrecarregar a infraestrutura do banco. O botão **🔄 Atualizar Dados** limpa o cache sob demanda.
+* **Interface Moderna e Responsiva:**
+  * Cabeçalho com gradiente animado e indicador de conexão ao vivo com o banco.
+  * Cartões de indicadores com ícones animados ao passar o mouse: a 📦 caixa recebe eletrônicos, moedas 🪙 caem ao redor do 💰 saco de dinheiro, a 🚨 sirene pisca em vermelho e o ⚠️ triângulo de alerta vibra.
+  * Abas em formato de pílula, gráficos com tema único e paleta de cores validada para daltonismo.
+  * Tema claro e escuro automáticos, layout adaptado para celular e respeito à preferência de "reduzir movimento" do sistema.
+* **Estrutura Modular em 6 Abas Analíticas:**
+  1. **📊 Visão Geral & Ruptura:** Gráfico de barras horizontais de capital retido por categoria, gráfico de rosca da distribuição do status de reposição (*CRÍTICO*, *ALERTA*, *NORMAL*, *EXCESSO*) e matriz de recompra prioritária dos produtos zerados. Os indicadores do topo (volume físico, capital imobilizado, produtos críticos e em alerta) ficam visíveis em todas as abas.
   2. **🏭 Análise de Fornecedores:** Indicadores de concentração de suprimentos, share de volume físico e capital imobilizado por parceiro comercial e matriz comparativa de dependência operacional.
-  3. **💡 Inteligência de Compras:** Painel de *Procurement Analytics* com auditoria de propostas concorrentes, identificação de savings potenciais e otimização da relação custo unitário vs. prazo de entrega.
+  3. **💡 Inteligência de Compras:** Painel de *Procurement Analytics* com auditoria de propostas concorrentes, savings potenciais, matriz de trade-off custo vs. prazo e o **simulador de recompra**: para cada produto em ruptura ou alerta, a melhor opção geral pela nota e uma comparação com as alternativas (💰 mais barata, ⚡ mais rápida, 📦 menor lote), com a diferença e o motivo de cada uma não ter vencido.
   4. **🛡️ Ranking & Risco:** Cartões de alerta por fornecedor (🟢 Bom, 🟡 Médio, 🔴 Perigoso) com nota e motivo principal, ranking com a nota de cada fator, mapa de calor dos problemas por tipo, tempo médio de resolução e histórico de ocorrências com filtros.
-  5. **📋 Tabela Operacional & Exportação:** Visualização detalhada em tabela interativa com badges visuais de status, formatação monetária padrão BRL (R$) e botão de exportação imediata dos dados filtrados para formato `.csv` (Excel).
-  6. **🤖 Assistente IA & Compras:** Interface conversacional com o **Google Gemini**, municiada com o contexto do banco de dados em tempo real, streaming de respostas, botões de consulta rápida e recomendações multicritério de aquisição.
+  5. **📋 Tabela Operacional & Exportação:** Visualização detalhada em tabela interativa com formatação monetária padrão BRL (R$) e exportação dos dados filtrados em **Excel (.xlsx) estilizado** ou `.csv`.
+  6. **🤖 Assistente IA & Compras:** Interface conversacional com o **Google Gemini**, municiada com o contexto do banco de dados e o ranking de fornecedores em tempo real, botões de consulta rápida e recomendações que consideram preço, prazo, lote e risco.
 
 ---
 
@@ -378,8 +400,8 @@ Siga o passo a passo abaixo para clonar, configurar e executar todos os estágio
 ### 1. Clonar o Repositório
 
 ```bash
-git clone https://github.com/paulocid95/pipeline-analise-estoque-python.git
-cd pipeline-analise-estoque-python
+git clone https://github.com/paulocid95/pipeline-de-engenharia-e-analise-de-estoque.git
+cd pipeline-de-engenharia-e-analise-de-estoque
 ```
 
 ### 2. Configurar o Ambiente Virtual
@@ -401,6 +423,8 @@ cd pipeline-analise-estoque-python
 ```bash
 pip install -r requirements.txt
 ```
+
+> As versões das bibliotecas são fixadas no `requirements.txt` para garantir que o projeto rode igual em qualquer máquina e no Streamlit Cloud (requer Python 3.11 ou mais novo).
 
 ### 4. Configurar as Variáveis de Ambiente e Segredos
 
@@ -471,7 +495,7 @@ python consultar_banco.py
 > python pipeline_completo.py
 > ```
 
-> 🧪 **Testes Automatizados:** As regras de limpeza (preços, estoques, categorias) e de status de reposição são cobertas por testes com `pytest`:
+> 🧪 **Testes Automatizados:** 69 testes com `pytest` cobrem as regras de limpeza (preços, estoques, categorias), o status de reposição, o cálculo da nota e a classificação dos fornecedores, a escolha da melhor opção e das alternativas e o limite de perguntas do assistente:
 > ```bash
 > pip install -r requirements-dev.txt
 > pytest
