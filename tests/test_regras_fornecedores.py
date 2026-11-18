@@ -12,7 +12,9 @@ from regras_fornecedores import (
     classificar,
     fator_recencia,
     fator_resolucao,
+    motivo_derrota,
     notas_cotacoes,
+    opcoes_por_produto,
     penalidade,
     ranking_fornecedores,
 )
@@ -212,3 +214,60 @@ def test_gerador_cobre_os_seis_fornecedores_e_o_processo_judicial_do_d():
     assert sorted(oc["fornecedor"].unique()) == [f"Fornecedor {l}" for l in "ABCDEF"]
     judicial_d = oc[(oc["fornecedor"] == "Fornecedor D") & (oc["tipo"] == "JUDICIAL")]
     assert (judicial_d["status"] == "ABERTO").all() and len(judicial_d) == 1
+
+
+# ------------------------------------------------------------------------------
+# Melhor opção e alternativas por produto
+# ------------------------------------------------------------------------------
+def _cotacoes_produto_unico():
+    """Produto 1: D é o mais barato (e Perigoso), A é o mais rápido, E tem o menor lote."""
+    return pd.DataFrame({
+        "id_produto": [1, 1, 1, 1],
+        "fornecedor": ["Fornecedor B", "Fornecedor D", "Fornecedor A", "Fornecedor E"],
+        "preco_cotado": [100.0, 85.0, 104.0, 112.0],
+        "prazo_dias": [5, 6, 3, 6],
+        "lote_minimo": [20, 40, 22, 8],
+    })
+
+
+def _ocorrencias_perfis():
+    return pd.DataFrame(
+        [ocorrencia(fornecedor="Fornecedor D", tipo="JUDICIAL", gravidade="CRITICA", dias_atras=44, status="ABERTO")]
+        + [ocorrencia(fornecedor="Fornecedor A", tipo="ATRASO", gravidade="ALTA", dias_atras=d, dias_para_resolver=15)
+           for d in (10, 40, 70, 100)]
+    )
+
+
+def test_melhor_opcao_e_alternativas_por_criterio():
+    cot = _cotacoes_produto_unico()
+    rk = ranking_fornecedores(cot, _ocorrencias_perfis(), HOJE)
+    op = opcoes_por_produto(avaliar_cotacoes(cot, rk))[1]
+    assert op["melhor"]["fornecedor"] == "Fornecedor B"
+    assert op["mais_barato"]["fornecedor"] == "Fornecedor D"
+    assert op["mais_rapido"]["fornecedor"] == "Fornecedor A"
+    assert op["menor_lote"]["fornecedor"] == "Fornecedor E"
+
+
+def test_alternativa_e_none_quando_a_melhor_opcao_ja_vence_no_criterio():
+    cot = pd.DataFrame({
+        "id_produto": [1, 1],
+        "fornecedor": ["Fornecedor B", "Fornecedor C"],
+        "preco_cotado": [90.0, 100.0],
+        "prazo_dias": [3, 5],
+        "lote_minimo": [10, 10],
+    })
+    rk = ranking_fornecedores(cot, pd.DataFrame(columns=_ocorrencias_perfis().columns), HOJE)
+    op = opcoes_por_produto(avaliar_cotacoes(cot, rk))[1]
+    assert op["melhor"]["fornecedor"] == "Fornecedor B"
+    # B é o mais barato, o mais rápido e empata no lote com a maior nota
+    assert op["mais_barato"] is None and op["mais_rapido"] is None and op["menor_lote"] is None
+
+
+def test_motivo_derrota_explica_por_que_a_alternativa_perdeu():
+    cot = _cotacoes_produto_unico()
+    rk = ranking_fornecedores(cot, _ocorrencias_perfis(), HOJE)
+    op = opcoes_por_produto(avaliar_cotacoes(cot, rk))[1]
+    melhor = op["melhor"]
+    assert motivo_derrota(op["mais_barato"], melhor) == "🔴 Desclassificado: Processo judicial em aberto há 44 dias"
+    assert motivo_derrota(op["mais_rapido"], melhor).startswith("🟡 Menos confiável: Atraso na entrega")
+    assert motivo_derrota(op["menor_lote"], melhor) == "Preço 12% acima da melhor opção"

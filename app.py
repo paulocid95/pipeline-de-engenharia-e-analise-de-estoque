@@ -4,6 +4,8 @@ Este arquivo monta a página: filtros, indicadores e abas.
 O conteúdo de cada aba fica em dashboard/aba_*.py.
 """
 
+from datetime import date
+
 import pandas as pd
 import streamlit as st
 
@@ -19,6 +21,7 @@ from dashboard.estilo import aplicar_estilo
 from dashboard.componentes import cabecalho, cartoes_kpi
 from dashboard.formatacao import formatar_moeda_brl
 from regras_estoque import LIMITE_ALERTA
+from regras_fornecedores import avaliar_cotacoes, ranking_fornecedores
 
 # ==============================================================================
 # 1. CONFIGURAÇÃO DA PÁGINA
@@ -35,6 +38,13 @@ aplicar_estilo()
 engine = obter_conexao()
 df = carregar_dados_analiticos()
 df_cot = carregar_dados_cotacoes()
+df_ocorrencias = carregar_ocorrencias()
+
+# Ranking de fornecedores e nota de cada cotação (preço, prazo, lote e confiabilidade)
+ranking = ranking_fornecedores(
+    df_cot, df_ocorrencias, date.today(), chave_produto="sku", coluna_fornecedor="fornecedor_cotacao",
+)
+df_cot_avaliado = avaliar_cotacoes(df_cot, ranking, chave_produto="sku", coluna_fornecedor="fornecedor_cotacao")
 
 
 # ==============================================================================
@@ -154,10 +164,10 @@ with tab_fornecedores:
     aba_fornecedores.renderizar(df_filtrado)
 
 with tab_compras:
-    aba_compras.renderizar(df_cot_filtrado)
+    aba_compras.renderizar(df_cot_filtrado, df_cot_avaliado)
 
 with tab_ranking:
-    aba_ranking.renderizar(df_cot, carregar_ocorrencias())
+    aba_ranking.renderizar(df_cot, df_ocorrencias)
 
 with tab_tabela:
     aba_tabela.renderizar(df_filtrado)

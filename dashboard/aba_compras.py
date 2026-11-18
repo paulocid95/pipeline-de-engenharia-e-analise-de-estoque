@@ -6,9 +6,128 @@ import streamlit as st
 
 from dashboard.formatacao import formatar_moeda_brl
 from dashboard.graficos import CORES_FORNECEDOR, exibir_grafico
+from regras_fornecedores import ICONE_CLASSE, motivo_derrota, opcoes_por_produto
 
 
-def renderizar(df_cot_filtrado: pd.DataFrame) -> None:
+def _fmt_dias(valor) -> str:
+    return f"{int(valor)} dias"
+
+
+def _sem_quebra(texto: str) -> str:
+    """Troca espaços por espaços não separáveis, para valores curtos não quebrarem linha."""
+    return texto.replace(" ", " ")
+
+
+def _linha_opcao(rotulo: str, opcao: pd.Series, diferenca: str = "", observacao: str = "—") -> str:
+    classe = _sem_quebra(f"{ICONE_CLASSE[opcao['classe']]} {opcao['fornecedor_cotacao']}")
+    preco = _sem_quebra(formatar_moeda_brl(float(opcao["preco_cotado"])))
+    return (
+        f"| {rotulo} | {classe} | {preco} | {_sem_quebra(_fmt_dias(opcao['prazo_dias']))} | "
+        f"{_sem_quebra(str(int(opcao['lote_minimo'])) + ' un')} | {opcao['nota_cotacao']:.0f} | "
+        f"{_sem_quebra(diferenca) if diferenca else '—'} | {observacao} |"
+    )
+
+
+def _detalhe_produto(opcoes: dict) -> str:
+    """Tabela Markdown comparando a melhor opção com quem vence em cada critério isolado."""
+    melhor = opcoes["melhor"]
+    linhas = [
+        "| Critério | Fornecedor | Preço | Prazo | Lote | Nota | Diferença | Por que não venceu |",
+        "| :--- | :--- | ---: | ---: | ---: | ---: | :--- | :--- |",
+        _linha_opcao("✅ **Melhor opção**", melhor, observacao="Melhor equilíbrio entre preço, prazo, lote e confiabilidade"),
+    ]
+    rotulos = {"mais_barato": "💰 Mais barato", "mais_rapido": "⚡ Mais rápido", "menor_lote": "📦 Menor lote"}
+    for criterio, rotulo in rotulos.items():
+        alt = opcoes[criterio]
+        if alt is None:
+            linhas.append(f"| {rotulo} | *(mesmo da melhor opção)* | | | | | | |")
+            continue
+        if criterio == "mais_barato":
+            diferenca = f"−{formatar_moeda_brl(float(melhor['preco_cotado'] - alt['preco_cotado']))}"
+        elif criterio == "mais_rapido":
+            diferenca = f"−{int(melhor['prazo_dias'] - alt['prazo_dias'])} dias"
+        else:
+            diferenca = f"−{int(melhor['lote_minimo'] - alt['lote_minimo'])} un"
+        linhas.append(_linha_opcao(rotulo, alt, diferenca, motivo_derrota(alt, melhor)))
+    return "\n".join(linhas)
+
+
+def _simulador_recompra(df_cot_filtrado: pd.DataFrame, df_cot_avaliado: pd.DataFrame) -> None:
+    st.markdown("##### 🚨 Simulador de Recompra: Melhor Opção para Itens em Ruptura ou Alerta")
+    st.caption(
+        "A melhor opção combina preço, prazo, lote mínimo e confiabilidade do fornecedor (aba 🛡️ Ranking & Risco). "
+        "As alternativas mostram quem vence em cada critério isolado e por que não foi a escolhida: a decisão final é sua."
+    )
+
+    skus = df_cot_filtrado.loc[df_cot_filtrado["status_reposicao"].isin(["CRITICO", "ALERTA"]), "sku"].unique()
+    if len(skus) == 0:
+        st.success("✅ **Nenhum produto em status CRÍTICO ou ALERTA** requer recompra urgente nos filtros atuais.")
+        return
+
+    # Todas as propostas dos produtos em risco, para comparar com todos os fornecedores
+    cotacoes = df_cot_avaliado[df_cot_avaliado["sku"].isin(skus)]
+    opcoes = opcoes_por_produto(cotacoes, chave_produto="sku")
+
+    linhas, com_alternativas, economia, baratos_perigosos = [], [], 0.0, 0
+    for sku, op in opcoes.items():
+        melhor = op["melhor"]
+        qtd_alt = sum(op[c] is not None for c in ("mais_barato", "mais_rapido", "menor_lote"))
+        if qtd_alt:
+            com_alternativas.append((sku, op))
+        barato = op["mais_barato"]
+        if barato is not None:
+            economia += float(melhor["preco_cotado"] - barato["preco_cotado"])
+            baratos_perigosos += int(barato["classe"] == "PERIGOSO")
+        linhas.append({
+            "status": melhor["status_reposicao"],
+            "produto": melhor["nome_produto"],
+            "melhor": f"{ICONE_CLASSE[melhor['classe']]} {melhor['fornecedor_cotacao']}",
+            "nota": melhor["nota_cotacao"],
+            "preco": melhor["preco_cotado"],
+            "prazo": melhor["prazo_dias"],
+            "lote": melhor["lote_minimo"],
+            "alternativas": f"⚠️ {qtd_alt}" if qtd_alt else "—",
+        })
+
+    if com_alternativas:
+        resumo = f"⚠️ **{len(com_alternativas)} de {len(opcoes)} produtos** têm alternativas que vencem em algum critério."
+        if economia > 0:
+            resumo += (
+                f" Optar sempre pelo mais barato economizaria **{formatar_moeda_brl(economia)}** "
+                "(comprando uma unidade de cada produto)"
+                + (f", mas em {baratos_perigosos} produto(s) ele é 🔴 Perigoso." if baratos_perigosos else ".")
+            )
+        st.warning(resumo)
+    else:
+        st.success("✅ Em todos os produtos, a melhor opção também é a mais barata, a mais rápida e a de menor lote.")
+
+    tabela = pd.DataFrame(linhas).sort_values(["status", "produto"])
+    st.dataframe(
+        tabela,
+        column_config={
+            "status": st.column_config.TextColumn("Status"),
+            "produto": st.column_config.TextColumn("Produto"),
+            "melhor": st.column_config.TextColumn("Melhor opção"),
+            "nota": st.column_config.NumberColumn("Nota", format="%.0f"),
+            "preco": st.column_config.NumberColumn("Preço", format="R$ %.2f"),
+            "prazo": st.column_config.NumberColumn("Prazo", format="%d dias"),
+            "lote": st.column_config.NumberColumn("Lote mín.", format="%d un"),
+            "alternativas": st.column_config.TextColumn("Alternativas"),
+        },
+        hide_index=True,
+        width="stretch",
+    )
+
+    if com_alternativas:
+        st.markdown("###### 🔍 Comparação por produto")
+        for sku, op in sorted(com_alternativas, key=lambda item: str(item[1]["melhor"]["nome_produto"])):
+            melhor = op["melhor"]
+            qtd = sum(op[c] is not None for c in ("mais_barato", "mais_rapido", "menor_lote"))
+            with st.expander(f"{melhor['nome_produto']} · {qtd} alternativa(s)"):
+                st.markdown(_detalhe_produto(op))
+
+
+def renderizar(df_cot_filtrado: pd.DataFrame, df_cot_avaliado: pd.DataFrame) -> None:
     st.markdown(
         '<div class="tab-banner">💡 <strong>Cenário de Procurement:</strong> Auditoria de propostas concorrentes, identificação de saving potencial e otimização da relação custo vs. prazo de entrega.</div>',
         unsafe_allow_html=True,
@@ -82,42 +201,8 @@ def renderizar(df_cot_filtrado: pd.DataFrame) -> None:
 
         st.markdown("<br>", unsafe_allow_html=True)
 
-        # 3. Simulador de Recompra para Ruptura / Alerta
-        st.markdown("##### 🚨 Simulador de Recompra: Melhor Oferta para Itens em Ruptura ou Alerta")
-        st.caption("Identificação automática do fornecedor mais vantajoso para os itens que demandam reposição operacional imediata.")
-
-        df_reposicao_cot = df_melhores_ofertas[
-            df_melhores_ofertas["status_reposicao"].isin(["CRITICO", "ALERTA"])
-        ].copy()
-
-        if not df_reposicao_cot.empty:
-            df_reposicao_cot = df_reposicao_cot.sort_values(by="saving_unitario", ascending=False)
-            
-            df_reposicao_exibicao = df_reposicao_cot[[
-                "status_reposicao", "nome_produto", "nome_categoria", "preco_referencia",
-                "fornecedor_cotacao", "preco_cotado", "saving_unitario", "saving_pct",
-                "lote_minimo", "prazo_dias"
-            ]].copy()
-
-            st.dataframe(
-                df_reposicao_exibicao,
-                column_config={
-                    "status_reposicao": st.column_config.TextColumn("Status"),
-                    "nome_produto": st.column_config.TextColumn("Produto"),
-                    "nome_categoria": st.column_config.TextColumn("Categoria"),
-                    "preco_referencia": st.column_config.NumberColumn("Preço de Tabela", format="R$ %.2f"),
-                    "fornecedor_cotacao": st.column_config.TextColumn("Melhor Fornecedor"),
-                    "preco_cotado": st.column_config.NumberColumn("Preço Cotado", format="R$ %.2f"),
-                    "saving_unitario": st.column_config.NumberColumn("Saving Unitário", format="R$ %.2f"),
-                    "saving_pct": st.column_config.NumberColumn("Saving (%)", format="%.1f%%"),
-                    "lote_minimo": st.column_config.NumberColumn("Lote Mínimo", format="%d un"),
-                    "prazo_dias": st.column_config.NumberColumn("Prazo", format="%d dias"),
-                },
-                hide_index=True,
-                width="stretch",
-            )
-        else:
-            st.success("✅ **Nenhum produto em status CRÍTICO ou ALERTA** requer recompra urgente nos filtros atuais.")
+        # 3. Simulador de Recompra: melhor opção geral + alternativas por critério
+        _simulador_recompra(df_cot_filtrado, df_cot_avaliado)
 
         st.markdown("<br>", unsafe_allow_html=True)
 

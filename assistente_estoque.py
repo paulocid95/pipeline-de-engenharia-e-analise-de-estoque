@@ -8,11 +8,20 @@ e entrega fluida via st.write_stream sem cortes ou truncamentos.
 import logging
 import os
 import time
+from datetime import date
 from typing import Generator
 import pandas as pd
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 import streamlit as st
+
+from regras_fornecedores import (
+    ROTULO_CLASSE,
+    avaliar_cotacoes,
+    motivo_derrota,
+    opcoes_por_produto,
+    ranking_fornecedores,
+)
 
 # Erros técnicos vão só para o log do servidor (visível apenas ao dono do app),
 # nunca para a tela, para não expor host, usuário do banco ou detalhes da API.
@@ -128,6 +137,23 @@ def extrair_contexto_executivo_estoque(_engine: Engine) -> str:
         logger.exception("Falha ao obter contexto do banco para o assistente")
         return "Aviso de banco: Não foi possível obter o contexto atualizado no momento."
 
+    # 3. Histórico de ocorrências (vazio se o pipeline ainda não gerou a tabela)
+    try:
+        df_oc = pd.read_sql(text(
+            "SELECT fornecedor, tipo, gravidade, data_ocorrencia, status, data_resolucao FROM core.fato_ocorrencias;"
+        ), _engine)
+    except Exception:
+        logger.exception("Histórico de ocorrências indisponível para o assistente")
+        df_oc = pd.DataFrame(columns=["fornecedor", "tipo", "gravidade", "data_ocorrencia", "status", "data_resolucao"])
+
+    # Ranking de risco e melhor opção por produto (mesmas regras do painel)
+    ranking = pd.DataFrame()
+    opcoes_sku: dict = {}
+    if not df_cot.empty:
+        ranking = ranking_fornecedores(df_cot, df_oc, date.today(), chave_produto="sku", coluna_fornecedor="fornecedor")
+        cot_avaliadas = avaliar_cotacoes(df_cot, ranking, chave_produto="sku", coluna_fornecedor="fornecedor")
+        opcoes_sku = opcoes_por_produto(cot_avaliadas, chave_produto="sku")
+
     if df_est.empty:
         return "Aviso: Nenhum registro de estoque encontrado na base de dados."
 
@@ -160,26 +186,45 @@ def extrair_contexto_executivo_estoque(_engine: Engine) -> str:
         ]
 
         cots = cotacoes_por_sku.get(sku, [])
-        if cots:
-            melhor_preco = min(cots, key=lambda x: x["preco_cotado"])
-            menor_prazo = min(cots, key=lambda x: x["prazo_dias"])
-
-            linhas.append(
-                f"    - Menor Custo: Fornecedor '{melhor_preco['fornecedor']}' por R$ {melhor_preco['preco_cotado']:.2f} "
-                f"(Prazo: {melhor_preco['prazo_dias']} dias | Lote Mín: {melhor_preco['lote_minimo']} un)"
-            )
-            linhas.append(
-                f"    - Mais Rápido (Lead Time): Fornecedor '{menor_prazo['fornecedor']}' em {menor_prazo['prazo_dias']} dias "
-                f"(Preço: R$ {menor_prazo['preco_cotado']:.2f} | Lote Mín: {menor_prazo['lote_minimo']} un)"
-            )
+        op = opcoes_sku.get(sku)
+        if cots and op is not None:
+            linhas.extend(_linhas_opcoes(op))
             opcoes_forn = [
-                f"{c['fornecedor']}: R$ {c['preco_cotado']:.2f} ({c['prazo_dias']} dias, lote {c['lote_minimo']} un)"
+                f"{c['fornecedor']} [{_classe_fornecedor(c['fornecedor'])}]: R$ {c['preco_cotado']:.2f} "
+                f"({c['prazo_dias']} dias, lote {c['lote_minimo']} un)"
                 for c in cots
             ]
             linhas.append(f"    - Todos Fornecedores Disponíveis: {'; '.join(opcoes_forn)}")
         else:
             linhas.append("    - Fornecedores: Nenhuma cotação concorrente cadastrada para este produto.")
 
+        return linhas
+
+    classes_por_fornecedor = (
+        {r.fornecedor: f"{ROTULO_CLASSE[r.classe]}, nota {r.nota_final:.0f}" for r in ranking.itertuples()}
+        if not ranking.empty else {}
+    )
+
+    def _classe_fornecedor(fornecedor: str) -> str:
+        return classes_por_fornecedor.get(fornecedor, "sem avaliação")
+
+    def _descrever(c) -> str:
+        return (
+            f"'{c['fornecedor']}' [{ROTULO_CLASSE[c['classe']]}] R$ {c['preco_cotado']:.2f}, "
+            f"{int(c['prazo_dias'])} dias, lote {int(c['lote_minimo'])} un, nota da proposta {c['nota_cotacao']:.0f}"
+        )
+
+    def _linhas_opcoes(op: dict) -> list[str]:
+        melhor = op["melhor"]
+        linhas = [f"    - MELHOR OPÇÃO GERAL (recomendar): {_descrever(melhor)}"]
+        rotulos = {"mais_barato": "Alternativa mais barata", "mais_rapido": "Alternativa mais rápida",
+                   "menor_lote": "Alternativa de menor lote"}
+        for criterio, rotulo in rotulos.items():
+            alt = op[criterio]
+            if alt is None:
+                linhas.append(f"    - {rotulo}: a própria melhor opção")
+            else:
+                linhas.append(f"    - {rotulo}: {_descrever(alt)} | Por que não venceu: {motivo_derrota(alt, melhor)}")
         return linhas
 
     # Montagem do relatório contextual executivo
@@ -189,6 +234,22 @@ def extrair_contexto_executivo_estoque(_engine: Engine) -> str:
         f"- Volume físico disponível: {total_unidades:,} unidades",
         f"- Capital total imobilizado: R$ {capital_total:,.2f}",
         f"- Distribuição por Status de Reposição: {contagem_status}",
+        "",
+        "### RANKING E RISCO DE FORNECEDORES (nota 0-100: preço 30%, prazo 20%, lote 10%, confiabilidade 40%)",
+    ]
+    if not ranking.empty:
+        sem_historico = df_oc.empty
+        for posicao, r in enumerate(ranking.itertuples(), start=1):
+            linhas_contexto.append(
+                f"  {posicao}. {r.fornecedor}: {ROTULO_CLASSE[r.classe].upper()} | nota {r.nota_final:.0f} | "
+                f"confiabilidade {r.nota_confiabilidade:.0f} | {r.ocorrencias_12m} ocorrências em 12 meses "
+                f"({r.sem_solucao} sem solução) | Motivo: {r.motivo}"
+            )
+        if sem_historico:
+            linhas_contexto.append("  (Atenção: histórico de ocorrências ainda não gerado; confiabilidade considerada 100.)")
+    else:
+        linhas_contexto.append("  * Ranking indisponível: nenhuma cotação registrada.")
+    linhas_contexto += [
         "",
         "### ITENS EM SITUAÇÃO CRÍTICA (RUPTURA IMINENTE OU ESTOQUE ZERADO) COM SEUS FORNECEDORES:",
     ]
@@ -208,20 +269,15 @@ def extrair_contexto_executivo_estoque(_engine: Engine) -> str:
         linhas_contexto.append("  * Nenhum SKU em estado de alerta.")
 
     linhas_contexto.append("")
-    linhas_contexto.append("### MATRIZ CONSOLIDADA DE COTAÇÕES DE FORNECEDORES (TODOS OS SKUS):")
-    if not df_cot.empty:
-        for sku, group in df_cot.groupby("sku"):
-            nome = group["nome_produto"].iloc[0]
-            melhor_preco_row = group.sort_values(by="preco_cotado").iloc[0]
-            menor_prazo_row = group.sort_values(by="prazo_dias").iloc[0]
-
-            linhas_contexto.append(f"  * SKU [{sku}] - {nome}:")
-            linhas_contexto.append(
-                f"    - Menor Preço: '{melhor_preco_row['fornecedor']}' (R$ {melhor_preco_row['preco_cotado']:.2f}, {melhor_preco_row['prazo_dias']}d, lote {melhor_preco_row['lote_minimo']}un)"
-            )
-            linhas_contexto.append(
-                f"    - Menor Prazo: '{menor_prazo_row['fornecedor']}' ({menor_prazo_row['prazo_dias']}d, R$ {menor_prazo_row['preco_cotado']:.2f}, lote {menor_prazo_row['lote_minimo']}un)"
-            )
+    linhas_contexto.append("### DEMAIS PRODUTOS (SITUAÇÃO NORMAL OU EXCESSO) COM SUAS OPÇÕES DE FORNECEDOR:")
+    # Produtos críticos e em alerta já foram detalhados acima: aqui entram só os demais
+    ja_detalhados = set(criticos["sku"].astype(str)) | set(alertas["sku"].astype(str))
+    if opcoes_sku:
+        for sku, op in opcoes_sku.items():
+            if str(sku) in ja_detalhados:
+                continue
+            linhas_contexto.append(f"  * SKU [{sku}] - {op['melhor']['nome_produto']}:")
+            linhas_contexto.extend(_linhas_opcoes(op))
     else:
         linhas_contexto.append("  * Nenhuma cotação de fornecedor registrada.")
 
@@ -241,18 +297,21 @@ DIRETRIZES FUNDAMENTAIS DE COMPORTAMENTO:
 2. PRECISÃO FÁTICA (ZERO ALUCINAÇÃO): Use exclusivamente os dados reais fornecidos no CONTEXTO OPERACIONAL DO BANCO abaixo. Não invente números, SKUs, preços ou fornecedores inexistentes.
 3. TABELA MARKDOWN OBRIGATÓRIA PARA REPOSIÇÃO E COMPRAS:
    Sempre que o usuário perguntar sobre reposição, produtos críticos, itens em alerta, análise de fornecedores ou decisões de compra, você DEVE estruturar sua resposta PRINCIPALMENTE através de uma TABELA MARKDOWN com as seguintes colunas obrigatórias:
-   | Produto Crítico | Fornecedor Recomendado | Preço Cotado (R$) | Prazo de Entrega (dias) | Justificativa da Escolha |
+   | Produto Crítico | Fornecedor Recomendado | Classificação | Preço Cotado (R$) | Prazo de Entrega (dias) | Justificativa da Escolha |
 
    - "Produto Crítico": Nome completo do produto acompanhado do SKU.
    - "Fornecedor Recomendado": Nome do fornecedor mais vantajoso segundo o critério analisado.
+   - "Classificação": Classe do fornecedor no ranking de risco, com ícone: 🟢 Bom, 🟡 Médio ou 🔴 Perigoso, e a nota (ex: "🟢 Bom (86)").
    - "Preço Cotado (R$)": Valor unitário cotado (ex: R$ 1.250,00).
    - "Prazo de Entrega (dias)": Prazo de entrega em dias corridos do fornecedor recomendado.
-   - "Justificativa da Escolha": Racional executivo claro (ex: "Menor preço unitário com economia de 8,5%", "Entrega emergencial em 2 dias para estancar ruptura", ou "Melhor equilíbrio custo-benefício com lote mínimo viável").
+   - "Justificativa da Escolha": Racional executivo claro (ex: "Melhor nota geral: preço competitivo e fornecedor confiável", "Entrega emergencial em 2 dias para estancar ruptura", ou "Melhor equilíbrio custo-benefício com lote mínimo viável").
 
-4. CRITÉRIOS DE DECISÃO DE COMPRAS:
-   - Se o foco for "menor preço" ou "custo-benefício": priorize o menor preço cotado, mas aponte o prazo e lote mínimo.
-   - Se o foco for "urgência", "lead time mais rápido" ou "reposição imediata": priorize o menor prazo de entrega em dias, explicitando o trade-off de custo.
-   - Se a pergunta for ampla: recomende o melhor equilíbrio e aponte alternativas quando houver divergência relevante entre menor preço e menor prazo.
+4. CRITÉRIOS DE DECISÃO DE COMPRAS E RISCO DE FORNECEDORES:
+   - Por padrão, recomende a "MELHOR OPÇÃO GERAL" de cada produto informada no contexto. Ela combina preço, prazo, lote mínimo e confiabilidade (histórico de atrasos, defeitos, itens errados, processos judiciais, divergências, falhas de atendimento e avarias).
+   - Nunca recomende como opção principal um fornecedor 🔴 Perigoso. Se ele for o mais barato ou o mais rápido, cite-o apenas como alternativa, com um aviso explícito e o motivo (ex: "o Fornecedor D é R$ 190,00 mais barato, mas está 🔴 Perigoso: processo judicial em aberto há 44 dias").
+   - Se o foco for "menor preço" ou "urgência": destaque a alternativa mais barata ou mais rápida informada no contexto, mas sempre mostre a classificação dela e compare com a melhor opção geral.
+   - Após a tabela, liste as alternativas relevantes (mais barata, mais rápida, menor lote) com a diferença de preço, de prazo ou de lote e o motivo de não terem vencido, deixando claro que a decisão final é do usuário.
+   - Se perguntarem sobre um fornecedor, use o RANKING E RISCO DE FORNECEDORES: classe, nota, ocorrências em 12 meses, problemas sem solução e motivo principal.
 
 5. COMPLETUDE E NÃO TRUNCAMENTO:
    - Apresente a relação completa de TODOS os produtos críticos identificados sem cortar a resposta.

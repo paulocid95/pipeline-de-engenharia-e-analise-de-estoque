@@ -265,3 +265,54 @@ def avaliar_cotacoes(
         + PESOS["confiabilidade"] * cot["nota_confiabilidade"].fillna(100.0)
     ).round(1)
     return cot
+
+
+# ------------------------------------------------------------------------------
+# Melhor opção por produto e alternativas por critério
+# ------------------------------------------------------------------------------
+# Critério isolado -> coluna da cotação em que o menor valor vence
+CRITERIOS_ALTERNATIVA = {
+    "mais_barato": "preco_cotado",
+    "mais_rapido": "prazo_dias",
+    "menor_lote": "lote_minimo",
+}
+
+
+def opcoes_por_produto(cotacoes_avaliadas: pd.DataFrame, chave_produto: str = "id_produto") -> dict:
+    """Para cada produto: a melhor opção pela nota e quem vence em cada critério isolado.
+
+    `cotacoes_avaliadas` vem de avaliar_cotacoes. Devolve
+    {produto: {"melhor": linha, "mais_barato": linha|None, "mais_rapido": ..., "menor_lote": ...}}.
+    Uma alternativa é None quando a própria melhor opção já vence naquele critério.
+    """
+    resultado = {}
+    for produto, grupo in cotacoes_avaliadas.groupby(chave_produto):
+        melhor = grupo.sort_values(["nota_cotacao", "preco_cotado"], ascending=[False, True]).iloc[0]
+        opcoes = {"melhor": melhor}
+        for criterio, coluna in CRITERIOS_ALTERNATIVA.items():
+            # Em empate no critério, vence quem tem a maior nota (a melhor opção, se ela empatar)
+            vencedor = grupo.sort_values([coluna, "nota_cotacao"], ascending=[True, False]).iloc[0]
+            opcoes[criterio] = None if vencedor.name == melhor.name else vencedor
+        resultado[produto] = opcoes
+    return resultado
+
+
+def motivo_derrota(alternativa: pd.Series, melhor: pd.Series) -> str:
+    """Explica em uma frase por que a alternativa não foi a melhor opção geral."""
+    if alternativa["classe"] == "PERIGOSO":
+        return f"{ICONE_CLASSE['PERIGOSO']} Desclassificado: {alternativa['motivo']}"
+
+    perdas = {
+        fator: PESOS[fator] * (melhor[f"nota_{fator}"] - alternativa[f"nota_{fator}"])
+        for fator in ("preco", "prazo", "lote", "confiabilidade")
+    }
+    fator = max(perdas, key=perdas.get)
+    if fator == "preco":
+        pct = (alternativa["preco_cotado"] / melhor["preco_cotado"] - 1) * 100
+        return f"Preço {pct:.0f}% acima da melhor opção"
+    if fator == "prazo":
+        dias = int(alternativa["prazo_dias"] - melhor["prazo_dias"])
+        return f"Entrega {dias} dia(s) mais lenta que a melhor opção"
+    if fator == "lote":
+        return f"Lote mínimo de {int(alternativa['lote_minimo'])} un (melhor opção: {int(melhor['lote_minimo'])} un)"
+    return f"{ICONE_CLASSE[alternativa['classe']]} Menos confiável: {alternativa['motivo']}"
