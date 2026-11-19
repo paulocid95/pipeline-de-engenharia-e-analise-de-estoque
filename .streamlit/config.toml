@@ -1,0 +1,7 @@
+# Cor de destaque do app (seleções, abas, caixas de marcação). Verde em vez do vermelho padrão,
+# que passa a impressão de erro. O tema claro usa um verde mais escuro para ser legível no fundo branco.
+[theme.light]
+primaryColor = "#16a34a"
+
+[theme.dark]
+primaryColor = "#4ade80"
