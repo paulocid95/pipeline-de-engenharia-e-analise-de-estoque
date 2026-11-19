@@ -362,6 +362,7 @@ A aba **📈 Previsão de Demanda** (`previsao_demanda.py`) usa o histórico de 
 3. **Picos isolados** (promoções, compras atípicas) são limitados para não inflarem a previsão.
 4. **Confiança e incerteza:** cada produto mostra o modelo vencedor, o erro no teste (alta / média / baixa) e uma faixa de 90% no gráfico.
 5. **Sugestão de compra:** venda prevista até o pedido chegar + período de cobertura + estoque de segurança − estoque atual, arredondada para o **lote mínimo do fornecedor recomendado** (nunca um 🔴 Perigoso). Produtos que vão acabar antes da reposição chegar ganham o alerta **⏳ Ruptura prevista** na Visão Geral, e a previsão também vai para o contexto do assistente de IA.
+6. **📝 Pedido de compra em Excel** (`pedido_compra.py`): o usuário marca os itens e ajusta as quantidades numa tabela editável e baixa um Excel com uma aba de **resumo** e **uma aba por fornecedor** (preço, subtotal, lote mínimo, prazo, chegada prevista e motivo da compra). Subtotais e totais são fórmulas, então mudar uma quantidade no Excel atualiza os valores. O mesmo pedido pode ser baixado pela aba de Compras.
 
 Parâmetros ajustáveis na tela: período que a compra deve cobrir, dias de segurança, janela de histórico e prazo de reposição (automático pelo fornecedor ou digitado).
 

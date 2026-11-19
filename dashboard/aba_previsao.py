@@ -6,6 +6,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
+from dashboard import pedido
 from dashboard.componentes import aviso_dados_faltando
 from dashboard.formatacao import formatar_moeda_brl
 from dashboard.graficos import COR_DESTAQUE, COR_NEUTRA, exibir_grafico
@@ -231,6 +232,7 @@ def renderizar(resultado: ResultadoPrevisao | None, parametros: Parametros, skus
     st.subheader("🛒 Sugestão de compra por produto")
     st.caption("Em vermelho: produtos que vão acabar antes de um pedido feito hoje chegar.")
     _tabela(tabela)
+    pedido.editor(tabela, parametros, hoje)
 
     st.subheader("🔍 Previsão de um produto")
     nomes = dict(zip(tabela["nome_produto"], tabela["sku"]))

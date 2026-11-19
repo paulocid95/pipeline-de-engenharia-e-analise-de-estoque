@@ -7,7 +7,7 @@ import pandas as pd
 import streamlit as st
 
 from assistente_estoque import renderizar_interface_chat
-from dashboard import aba_compras, aba_fornecedores, aba_previsao, aba_ranking, aba_tabela, aba_visao_geral
+from dashboard import aba_compras, aba_fornecedores, aba_previsao, aba_ranking, aba_tabela, aba_visao_geral, pedido
 from dashboard.componentes import aviso_dados_faltando, cabecalho, cartoes_kpi
 from dashboard.estilo import aplicar_estilo
 from dashboard.formatacao import formatar_moeda_brl
@@ -222,6 +222,8 @@ def renderizar(fonte: Fonte) -> None:
                                              "simulamos a recompra.", chave="falta_cotacoes_compras")
         else:
             aba_compras.renderizar(df_cot_filtrado, df_cot_avaliado)
+        if previsao:
+            pedido.atalho(previsao.tabela[previsao.tabela["sku"].isin(set(df_filtrado["sku"]))], parametros, hoje)
 
     with tab_ranking:
         aba_ranking.renderizar(df_cot, fonte.ocorrencias, usuario=fonte.usuario)
