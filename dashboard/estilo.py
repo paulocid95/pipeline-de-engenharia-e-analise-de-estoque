@@ -237,6 +237,21 @@ div[data-testid="stChatMessage"] {
     box-shadow: 0 8px 18px -10px rgba(37, 99, 235, 0.8);
     border-color: var(--marca);
 }
+/* Botões principais em verde claro: o vermelho padrão do Streamlit passa a impressão de erro */
+[data-testid="stBaseButton-primary"]:not(:disabled),
+[data-testid="stBaseButton-primaryFormSubmit"]:not(:disabled) {
+    background: #4ade80 !important;
+    border-color: #4ade80 !important;
+    color: #052e16 !important;
+}
+[data-testid="stBaseButton-primary"]:not(:disabled) p,
+[data-testid="stBaseButton-primaryFormSubmit"]:not(:disabled) p { color: #052e16 !important; }
+[data-testid="stBaseButton-primary"]:hover:not(:disabled),
+[data-testid="stBaseButton-primaryFormSubmit"]:hover:not(:disabled) {
+    background: #22c55e !important;
+    border-color: #22c55e !important;
+    box-shadow: 0 8px 18px -10px rgba(34, 197, 94, 0.9);
+}
 
 /* Barra lateral */
 section[data-testid="stSidebar"] { border-right: 1px solid var(--borda); }
