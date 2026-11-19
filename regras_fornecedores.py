@@ -34,6 +34,7 @@ ROTULOS_TIPO = {
     "DIVERGENCIA_PRECO_NF": "Divergência de preço ou nota fiscal",
     "FALHA_ATENDIMENTO": "Falha de atendimento",
     "AVARIA_TRANSPORTE": "Avaria no transporte",
+    "OUTROS": "Outros problemas",   # tipos de planilhas enviadas que não se encaixam nos demais
 }
 ROTULOS_STATUS = {"RESOLVIDO": "Resolvido", "EM_ANDAMENTO": "Em andamento", "ABERTO": "Em aberto"}
 ROTULOS_GRAVIDADE = {"BAIXA": "Baixa", "MEDIA": "Média", "ALTA": "Alta", "CRITICA": "Crítica"}
@@ -76,7 +77,8 @@ def penalidade(
 
     base = PENALIDADE_GRAVIDADE[gravidade] * PESO_TIPO.get(tipo, 1.0)
     if status == "RESOLVIDO":
-        dias_para_resolver = (data_resolucao - data_ocorrencia).days
+        # Sem a data de resolução (planilhas enviadas), assume um tempo médio de 30 dias
+        dias_para_resolver = 30 if data_resolucao is None else (data_resolucao - data_ocorrencia).days
         return base * fator_resolucao(True, dias_para_resolver) * fator_recencia(idade)
     # Problema sem solução continua atual: não perde peso com o tempo, só piora
     return base * fator_resolucao(False, idade)
@@ -103,7 +105,8 @@ def calcular_penalidades(df_ocorrencias: pd.DataFrame, data_ref: date) -> pd.Dat
         for t, g, s, d_oc, d_res in zip(df["tipo"], df["gravidade"], df["status"], datas_oc, datas_res)
     ]
     df["dias_para_resolver"] = [
-        (d_res - d_oc).days if ok else None for ok, d_oc, d_res in zip(resolvido, datas_oc, datas_res)
+        (d_res - d_oc).days if ok and d_res is not None else None
+        for ok, d_oc, d_res in zip(resolvido, datas_oc, datas_res)
     ]
     df["dias_em_aberto"] = [
         None if ok else (data_ref - d_oc).days for ok, d_oc in zip(resolvido, datas_oc)
@@ -205,7 +208,8 @@ def ranking_fornecedores(
     medias = cot.groupby(coluna_fornecedor)[["nota_preco", "nota_prazo", "nota_lote"]].mean()
 
     oc = calcular_penalidades(df_ocorrencias, data_ref)
-    fornecedores = sorted(set(FORNECEDORES) | set(medias.index) | set(oc.get("fornecedor", [])))
+    # Só os fornecedores que aparecem nos dados (planilhas enviadas têm os próprios fornecedores)
+    fornecedores = sorted(set(medias.index) | set(oc.get("fornecedor", [])))
 
     linhas = []
     for forn in fornecedores:
