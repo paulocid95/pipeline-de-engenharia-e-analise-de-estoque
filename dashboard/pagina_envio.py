@@ -27,7 +27,7 @@ LIBERA = {
     "estoque": "Visão geral, alertas de ruptura, tabela e assistente de IA",
     "cotacoes": "Fornecedores e simulador de compras",
     "ocorrencias": "Ranking & Risco com a nota de confiabilidade",
-    "vendas": "Previsão de demanda (em breve)",
+    "vendas": "Previsão de demanda e sugestão de compra",
 }
 
 # Chaves do st.session_state

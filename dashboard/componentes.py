@@ -10,6 +10,7 @@ _FALTA = {
     "cotacoes": ("💰", "Cotações", "produto (ou SKU), fornecedor e preço", "prazo de entrega e lote mínimo"),
     "ocorrencias": ("⚠️", "Ocorrências", "fornecedor, tipo do problema e data", "gravidade, situação e data de resolução"),
     "fornecedor": ("🏭", "coluna Fornecedor no Estoque", "o fornecedor de cada produto", ""),
+    "vendas": ("📈", "Vendas", "data, produto (ou SKU) e quantidade vendida (de preferência 8 semanas ou mais)", ""),
 }
 
 

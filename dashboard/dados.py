@@ -13,6 +13,7 @@ from sqlalchemy import create_engine, text
 from datas_relativas import data_referencia, deslocar_datas, dias_desde
 from db import normalizar_url_banco
 from regras_estoque import classificar_status
+from simulacao_vendas import simular_vendas
 
 load_dotenv()
 try:
@@ -211,3 +212,9 @@ def carregar_ocorrencias() -> pd.DataFrame:
             "data_ocorrencia", "status", "data_resolucao", "descricao",
         ])
     return deslocar_datas(df, ["data_ocorrencia", "data_resolucao"], dias_desde_ultima_carga())
+
+
+@st.cache_data(ttl=300)
+def carregar_vendas_demonstracao(estoque: pd.DataFrame) -> pd.DataFrame:
+    """Histórico de vendas simulado da demonstração (o mesmo da planilha de exemplo, relativo a hoje)."""
+    return simular_vendas(estoque, date.today())

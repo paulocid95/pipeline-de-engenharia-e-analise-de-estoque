@@ -99,7 +99,7 @@
       "<b>Fornecedores:</b> nota de 0 a 100 combinando preço (30%), prazo (20%), lote mínimo (10%) e confiabilidade (40%).",
       "<b>Risco:</b> processos judiciais e problemas graves sem solução classificam o fornecedor como 🔴 Perigoso.",
       "<b>Compras:</b> a melhor opção de cada produto ao lado da mais barata e da mais rápida, com o motivo de cada uma ter perdido.",
-      "<b>Previsão (em breve):</b> com o histórico de vendas, quando cada item acaba e quanto comprar." ] },
+      "<b>Previsão:</b> com o histórico de vendas, quando cada item acaba e quanto comprar." ] },
     { t: "🤖 Passo 4: Pergunte à IA", i: [
       "<b>Em português:</b> \"o que preciso comprar esta semana?\", \"qual fornecedor devo evitar?\".",
       "<b>Contexto completo:</b> a IA lê o estoque, as cotações e o ranking de risco.",

@@ -168,7 +168,7 @@ SECOES = """
       <p>Nota de 0 a 100 por fornecedor: preço, prazo, lote mínimo e histórico de problemas. Alertas de fornecedor perigoso.</p></div>
     <div class="si-card si-recurso si-tilt si-rev"><div class="si-ico" style="background:rgba(25,158,112,.18)">🛒</div><h3>Simulador de compras</h3>
       <p>A melhor opção de cada produto lado a lado com a mais barata e a mais rápida, explicando por que cada uma perdeu.</p></div>
-    <div class="si-card si-recurso si-tilt si-rev"><div class="si-ico" style="background:rgba(224,160,32,.18)">📈</div><h3>Previsão de demanda <span class="si-emb">EM BREVE</span></h3>
+    <div class="si-card si-recurso si-tilt si-rev"><div class="si-ico" style="background:rgba(224,160,32,.18)">📈</div><h3>Previsão de demanda</h3>
       <p>Quando o produto vai acabar e quanto comprar, respeitando o prazo do fornecedor e o lote mínimo.</p></div>
     <div class="si-card si-recurso si-tilt si-rev"><div class="si-ico" style="background:rgba(213,81,129,.18)">🤖</div><h3>Assistente de IA</h3>
       <p>Pergunte em português. A IA conhece todo o estoque e nunca recomenda um fornecedor perigoso como opção principal.</p></div>

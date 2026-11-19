@@ -115,9 +115,19 @@ def test_vendas_deterministicas_e_relativas_a_hoje():
     v1 = simular_vendas(ESTOQUE, HOJE, dias=30)
     v2 = simular_vendas(ESTOQUE, HOJE, dias=30)
     pd.testing.assert_frame_equal(v1, v2)
-    assert len(v1) == 30 * len(ESTOQUE)
-    assert v1["data"].max() == date(2026, 11, 17)          # até ontem
-    assert (v1["quantidade_vendida"] >= 0).all()
+    assert 0 < len(v1) <= 30 * len(ESTOQUE)
+    assert v1["data"].max() <= date(2026, 11, 17)          # até ontem
+    assert (v1["quantidade_vendida"] > 0).all()            # só os dias com venda
+
+
+def test_vendas_simuladas_parecem_de_loja_real():
+    from simulacao_vendas import perfil_do_produto
+    produtos = pd.DataFrame({"sku": [f"S{i}" for i in range(40)], "nome_produto": [f"P{i}" for i in range(40)],
+                             "preco_unitario": [5000.0] * 20 + [50.0] * 20})
+    v = simular_vendas(produtos, HOJE)
+    assert not (pd.to_datetime(v["data"]).dt.weekday == 6).any()          # fechada aos domingos
+    perfis = {perfil_do_produto(s, p) for s, p in zip(produtos["sku"], produtos["preco_unitario"])}
+    assert perfis == {"regular", "alta", "queda", "esporadico"}
 
 
 def test_planilha_respeita_limite_de_linhas(planilha):

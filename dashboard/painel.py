@@ -1,17 +1,18 @@
 """Painel executivo (filtros, indicadores e abas), alimentado pela demonstração ou pela planilha do usuário."""
 
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 import pandas as pd
 import streamlit as st
 
 from assistente_estoque import renderizar_interface_chat
-from dashboard import aba_compras, aba_fornecedores, aba_ranking, aba_tabela, aba_visao_geral
+from dashboard import aba_compras, aba_fornecedores, aba_previsao, aba_ranking, aba_tabela, aba_visao_geral
 from dashboard.componentes import aviso_dados_faltando, cabecalho, cartoes_kpi
 from dashboard.estilo import aplicar_estilo
 from dashboard.formatacao import formatar_moeda_brl
 from regras_estoque import LIMITE_ALERTA
+from previsao_demanda import texto_para_ia
 from regras_fornecedores import avaliar_cotacoes, ranking_fornecedores
 
 NAO_INFORMADO = "Não informado"
@@ -31,6 +32,7 @@ class Fonte:
     estoque: pd.DataFrame
     cotacoes: pd.DataFrame
     ocorrencias: pd.DataFrame
+    vendas: pd.DataFrame | None = None     # histórico de vendas (None = não enviado)
     engine: object = None                  # conexão do banco (só na demonstração)
     usuario: bool = False                  # True = planilha enviada (dados só na sessão)
     limite_alerta: int = LIMITE_ALERTA
@@ -45,6 +47,7 @@ class Fonte:
             estoque=resultado.estoque,
             cotacoes=ou_vazio(resultado.cotacoes, COLUNAS_COTACOES),
             ocorrencias=ou_vazio(resultado.ocorrencias, COLUNAS_OCORRENCIAS),
+            vendas=resultado.vendas if resultado.vendas is not None and not resultado.vendas.empty else None,
             usuario=True, limite_alerta=limite_alerta, enviado_em=enviado_em, planilha_limpa=planilha_limpa,
         )
 
@@ -156,6 +159,23 @@ def _indicadores(fonte: Fonte, df_filtrado: pd.DataFrame) -> float:
     return valor_total
 
 
+def _previsao(fonte: Fonte, df_cot_avaliado: pd.DataFrame):
+    """Previsão de demanda com os parâmetros escolhidos na aba (None se não há vendas)."""
+    parametros = aba_previsao.parametros_atuais()
+    hoje = date.today()
+    if fonte.vendas is None or fonte.vendas.empty:
+        return None, parametros, hoje
+    # Planilha antiga: prevê a partir do dia seguinte à última venda registrada
+    ultima = pd.to_datetime(fonte.vendas["data"]).max().date()
+    hoje = min(hoje, ultima + timedelta(days=1))
+    cotacoes = df_cot_avaliado if not df_cot_avaliado.empty else None
+    previsao = aba_previsao.calcular(
+        fonte.estoque, fonte.vendas, hoje, parametros.horizonte, parametros.seguranca, parametros.janela,
+        parametros.prazo_manual, cotacoes,
+    )
+    return previsao, parametros, hoje
+
+
 def renderizar(fonte: Fonte) -> None:
     aplicar_estilo()
     df_filtrado, df_cot_filtrado = _barra_lateral(fonte)
@@ -169,20 +189,24 @@ def renderizar(fonte: Fonte) -> None:
                                        chave_produto="sku", coluna_fornecedor="fornecedor_cotacao")
         df_cot_avaliado = avaliar_cotacoes(df_cot, ranking, chave_produto="sku", coluna_fornecedor="fornecedor_cotacao")
 
+    previsao, parametros, hoje = _previsao(fonte, df_cot_avaliado)
+
     _topo(fonte)
     valor_total = _indicadores(fonte, df_filtrado)
 
-    tab_visao_geral, tab_fornecedores, tab_compras, tab_ranking, tab_tabela, tab_assistente = st.tabs([
+    (tab_visao_geral, tab_fornecedores, tab_compras, tab_ranking, tab_previsao, tab_tabela,
+     tab_assistente) = st.tabs([
         "📊 Visão Geral & Ruptura",
         "🏭 Análise de Fornecedores",
         "💡 Inteligência de Compras",
         "🛡️ Ranking & Risco",
+        "📈 Previsão de Demanda",
         "📋 Tabela Operacional & Exportação",
         "🤖 Assistente IA & Compras",
     ])
 
     with tab_visao_geral:
-        aba_visao_geral.renderizar(df_filtrado, valor_total)
+        aba_visao_geral.renderizar(df_filtrado, valor_total, previsao.tabela if previsao else None)
 
     with tab_fornecedores:
         if fonte.usuario and (fonte.estoque["fornecedor"] == NAO_INFORMADO).all():
@@ -202,9 +226,15 @@ def renderizar(fonte: Fonte) -> None:
     with tab_ranking:
         aba_ranking.renderizar(df_cot, fonte.ocorrencias, usuario=fonte.usuario)
 
+    with tab_previsao:
+        aba_previsao.renderizar(previsao, parametros, df_filtrado["sku"], hoje,
+                                tem_cotacoes=not df_cot.empty, usuario=fonte.usuario)
+
     with tab_tabela:
         aba_tabela.renderizar(df_filtrado)
 
     with tab_assistente:
         dados = (fonte.estoque, fonte.cotacoes, fonte.ocorrencias) if fonte.usuario else None
-        renderizar_interface_chat(fonte.engine, dados_usuario=dados)
+        texto_previsao = (texto_para_ia(previsao, parametros), texto_para_ia(previsao, parametros, limite=12)) \
+            if previsao else None
+        renderizar_interface_chat(fonte.engine, dados_usuario=dados, previsao=texto_previsao)

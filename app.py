@@ -11,6 +11,7 @@ from dashboard.dados import (
     carregar_dados_analiticos,
     carregar_dados_cotacoes,
     carregar_ocorrencias,
+    carregar_vendas_demonstracao,
     obter_conexao,
 )
 
@@ -27,10 +28,12 @@ if tela == "envio":
 elif tela == "meus_dados":
     pagina_envio.renderizar_meus_dados()
 elif tela == "painel":
+    estoque = carregar_dados_analiticos()
     painel.renderizar(painel.Fonte(
-        estoque=carregar_dados_analiticos(),
+        estoque=estoque,
         cotacoes=carregar_dados_cotacoes(),
         ocorrencias=carregar_ocorrencias(),
+        vendas=carregar_vendas_demonstracao(estoque),
         engine=obter_conexao(),
     ))
 else:

@@ -173,7 +173,9 @@ def test_planilha_de_exemplo_volta_aos_dados_originais(seed):
     assert (oc["fornecedor"], oc["tipo"], oc["gravidade"], oc["status"]) == ("Fornecedor D", "JUDICIAL", "ALTA", "ABERTO")
     assert oc["data_ocorrencia"] == date(2026, 10, 5)
 
-    assert len(r.vendas) == 90 * len(EST_DEMO)
+    from simulacao_vendas import simular_vendas
+    assert len(r.vendas) == len(simular_vendas(EST_DEMO, HOJE))
+    assert r.vendas["quantidade_vendida"].sum() == simular_vendas(EST_DEMO, HOJE)["quantidade_vendida"].sum()
     assert r.vendas["quantidade_vendida"].dtype.kind == "i"
 
 

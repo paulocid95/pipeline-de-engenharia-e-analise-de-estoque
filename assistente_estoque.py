@@ -554,11 +554,12 @@ def _exibir_contador(espaco) -> None:
     espaco.caption(f"💬 Perguntas restantes nesta sessão: **{restantes} de {LIMITE_PERGUNTAS_SESSAO}**")
 
 
-def renderizar_interface_chat(engine: Engine, dados_usuario: tuple | None = None) -> None:
+def renderizar_interface_chat(engine: Engine, dados_usuario: tuple | None = None, previsao: tuple | None = None) -> None:
     """Renderiza a interface do chatbot dentro do Streamlit, com gerenciamento
 
     enxuto de estado de sessão, feedback visual e streaming de resposta resiliente.
     `dados_usuario`: (estoque, cotações, ocorrências) de uma planilha enviada; None = demonstração (banco).
+    `previsao`: (texto completo, texto enxuto) da previsão de demanda, acrescentado ao contexto da IA.
     """
     usuario = dados_usuario is not None
     # Conversas separadas: a da demonstração não se mistura com a dos dados do usuário
@@ -691,6 +692,9 @@ def renderizar_interface_chat(engine: Engine, dados_usuario: tuple | None = None
                     else:
                         contexto = extrair_contexto_executivo_estoque(engine)
                         enxuto = extrair_contexto_executivo_estoque(engine, enxuto=True)
+                    if previsao:
+                        contexto += "\n\n" + previsao[0]
+                        enxuto += "\n\n" + previsao[1]
                     resposta = obter_resposta(
                         mensagens=mensagens[-10:], contexto_banco=contexto, api_key=api_key,
                         chave_groq=chave_groq, contexto_enxuto=enxuto,

@@ -9,11 +9,30 @@ from dashboard.formatacao import formatar_moeda_brl
 from dashboard.graficos import COR_DESTAQUE, COR_NEUTRA, CORES_STATUS, exibir_grafico
 
 
-def renderizar(df_filtrado: pd.DataFrame, valor_total: float) -> None:
+def _ruptura_prevista(df_filtrado: pd.DataFrame, previsao: pd.DataFrame | None) -> None:
+    """Produtos que ainda têm estoque, mas vão acabar antes de um pedido feito hoje chegar."""
+    if previsao is None or previsao.empty:
+        return
+    faltam = previsao[previsao["vai_faltar"] & (previsao["estoque"] > 0)
+                      & previsao["sku"].isin(set(df_filtrado["sku"]))].sort_values("dias_ate_acabar")
+    if faltam.empty:
+        return
+    itens = "\n".join(
+        f"- **{r.nome_produto}**: ⏳ vai faltar em **{int(r.dias_ate_acabar)} dia(s)** "
+        f"({r.data_ruptura:%d/%m}), mas a reposição leva {r.prazo} dias"
+        for r in faltam.head(8).itertuples()
+    )
+    resto = f"\n\n…e mais {len(faltam) - 8} produto(s)." if len(faltam) > 8 else ""
+    st.warning(f"**⏳ Ruptura prevista:** {len(faltam)} produto(s) ainda têm estoque, mas vão acabar antes de um "
+               f"pedido feito hoje chegar. Veja quanto comprar na aba 📈 Previsão de Demanda.\n\n{itens}{resto}")
+
+
+def renderizar(df_filtrado: pd.DataFrame, valor_total: float, previsao: pd.DataFrame | None = None) -> None:
     st.markdown(
         '<div class="tab-banner">🎯 <strong>Cenário Operacional:</strong> Diagnóstico da saúde do estoque e identificação imediata de SKUs zerados para priorização de recompra e mitigação de perda de receita.</div>',
         unsafe_allow_html=True,
     )
+    _ruptura_prevista(df_filtrado, previsao)
     col_graf1, col_graf2 = st.columns(2)
 
     # 1.1 Capital Imobilizado por Categoria (Barras Horizontais com Paleta Semântica)

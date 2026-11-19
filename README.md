@@ -349,6 +349,24 @@ Toda a integração com a IA foi construída seguindo as melhores práticas de e
 
 ---
 
+## 🔮 Previsão de Demanda (competição de modelos)
+
+A aba **📈 Previsão de Demanda** (`previsao_demanda.py`) usa o histórico de vendas para prever quando cada produto acaba e quanto comprar:
+
+1. **Calendário da loja detectado nos dados:** dias da semana sem vendas (ex.: fechada aos domingos) e dias atípicos sem nenhuma venda (feriados) ficam fora do cálculo. Lojas online, que vendem todos os dias, são reconhecidas automaticamente.
+2. **Competição de modelos por produto:** as últimas semanas do histórico são escondidas e cada modelo tenta prevê-las; vence o de menor erro no total semanal (WAPE):
+   * **Holt-Winters (ETS)** com tendência amortecida e sazonalidade semanal (`statsmodels`);
+   * **Croston (SBA)** para demanda intermitente (produtos que vendem em dias soltos);
+   * **Média móvel semanal** ajustada pelo perfil de cada dia da semana;
+   * **Ingênuo sazonal** como referência mínima.
+3. **Picos isolados** (promoções, compras atípicas) são limitados para não inflarem a previsão.
+4. **Confiança e incerteza:** cada produto mostra o modelo vencedor, o erro no teste (alta / média / baixa) e uma faixa de 90% no gráfico.
+5. **Sugestão de compra:** venda prevista até o pedido chegar + período de cobertura + estoque de segurança − estoque atual, arredondada para o **lote mínimo do fornecedor recomendado** (nunca um 🔴 Perigoso). Produtos que vão acabar antes da reposição chegar ganham o alerta **⏳ Ruptura prevista** na Visão Geral, e a previsão também vai para o contexto do assistente de IA.
+
+Parâmetros ajustáveis na tela: período que a compra deve cobrir, dias de segurança, janela de histórico e prazo de reposição (automático pelo fornecedor ou digitado).
+
+---
+
 ## 📈 Demonstração e Visualização
 
 A camada de visualização do projeto é composta por duas frentes complementares: um **dashboard interativo em nuvem** estruturado em 6 abas analíticas para suporte à decisão em tempo real e um conjunto de **gráficos executivos estáticos** para relatórios gerenciais de alta resolução.
@@ -371,13 +389,14 @@ A aplicação web interativa foi implantada em produção no **Streamlit Communi
   * Cartões de indicadores com ícones animados ao passar o mouse: a 📦 caixa recebe eletrônicos, moedas 🪙 caem ao redor do 💰 saco de dinheiro, a 🚨 sirene pisca em vermelho e o ⚠️ triângulo de alerta vibra.
   * Abas em formato de pílula, gráficos com tema único e paleta de cores validada para daltonismo.
   * Tema claro e escuro automáticos, layout adaptado para celular e respeito à preferência de "reduzir movimento" do sistema.
-* **Estrutura Modular em 6 Abas Analíticas:**
+* **Estrutura Modular em 7 Abas Analíticas:**
   1. **📊 Visão Geral & Ruptura:** Gráfico de barras horizontais de capital retido por categoria, gráfico de rosca da distribuição do status de reposição (*CRÍTICO*, *ALERTA*, *NORMAL*, *EXCESSO*) e matriz de recompra prioritária dos produtos zerados. Os indicadores do topo (volume físico, capital imobilizado, produtos críticos e em alerta) ficam visíveis em todas as abas.
   2. **🏭 Análise de Fornecedores:** Indicadores de concentração de suprimentos, share de volume físico e capital imobilizado por parceiro comercial e matriz comparativa de dependência operacional.
-  3. **💡 Inteligência de Compras:** Painel de *Procurement Analytics* com auditoria de propostas concorrentes, savings potenciais, matriz de trade-off custo vs. prazo e o **simulador de recompra**: para cada produto em ruptura ou alerta, a melhor opção geral pela nota e uma comparação com as alternativas (💰 mais barata, ⚡ mais rápida, 📦 menor lote), com a diferença e o motivo de cada uma não ter vencido.
+  3. **💡 Inteligência de Compras:** Painel de *Procurement Analytics* com auditoria de propostas concorrentes, savings potenciais, matriz de trade-off custo vs. prazo e o **simulador de recompra**: para cada produto em ruptura ou alerta, a melhor opção geral pela nota e uma comparação com as alternativas (💰 mais barata, 🚚💨 mais rápida, 📦 menor lote), com a diferença e o motivo de cada uma não ter vencido, e a lista de todas as ofertas de cada produto (as de fornecedores 🔴 marcadas como não recomendadas).
   4. **🛡️ Ranking & Risco:** Cartões de alerta por fornecedor (🟢 Bom, 🟡 Médio, 🔴 Perigoso) com nota e motivo principal, ranking com a nota de cada fator, mapa de calor dos problemas por tipo, tempo médio de resolução e histórico de ocorrências com filtros.
-  5. **📋 Tabela Operacional & Exportação:** Visualização detalhada em tabela interativa com formatação monetária padrão BRL (R$) e exportação dos dados filtrados em **Excel (.xlsx) estilizado** ou `.csv`.
-  6. **🤖 Assistente IA & Compras:** Interface conversacional com o **Google Gemini**, municiada com o contexto do banco de dados e o ranking de fornecedores em tempo real, botões de consulta rápida e recomendações que consideram preço, prazo, lote e risco.
+  5. **📈 Previsão de Demanda:** quanto cada produto deve vender, quando o estoque acaba e quanto comprar de quem (veja a seção abaixo).
+  6. **📋 Tabela Operacional & Exportação:** Visualização detalhada em tabela interativa com formatação monetária padrão BRL (R$) e exportação dos dados filtrados em **Excel (.xlsx) estilizado** ou `.csv`.
+  7. **🤖 Assistente IA & Compras:** Interface conversacional com o **Google Gemini** (reserva **Groq**), municiada com o contexto do banco de dados e o ranking de fornecedores em tempo real, botões de consulta rápida e recomendações que consideram preço, prazo, lote e risco.
 
 ---
 
