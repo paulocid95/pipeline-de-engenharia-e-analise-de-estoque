@@ -199,7 +199,7 @@ SECOES = """
 
 RODAPE = f"""
 <div class="si si-rodape">
-  <div class="si-stack"><span>🐍 Python</span><span>🐼 pandas</span><span>🐘 PostgreSQL</span><span>📊 Plotly</span><span>🎈 Streamlit</span><span>✨ Gemini</span></div>
+  <div class="si-stack"><span>🐍 Python</span><span>🐼 pandas</span><span>🐘 PostgreSQL</span><span>📊 Plotly</span><span>🎈 Streamlit</span><span>✨ Gemini</span><span>⚡ Groq</span></div>
   Projeto de portfólio · Pipeline de engenharia e análise de estoque ·
   <a href="{URL_GITHUB}" target="_blank" rel="noopener">Código no GitHub</a>
 </div>

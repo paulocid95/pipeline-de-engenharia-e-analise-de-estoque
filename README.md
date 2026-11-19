@@ -9,6 +9,7 @@
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Neon_Serverless-336791?logo=postgresql&logoColor=white)
 ![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-ORM%2FCore-D71F00?logo=sqlalchemy&logoColor=white)
 ![Google Gemini](https://img.shields.io/badge/Google%20Gemini-3.8%20Flash-4285F4?logo=googlegemini&logoColor=white)
+![Groq](https://img.shields.io/badge/Groq-reserva%20gratuita-F55036)
 ![GenAI](https://img.shields.io/badge/AI-Assisted%20Procurement-8E75B2)
 ![Streamlit](https://img.shields.io/badge/Streamlit-Community_Cloud-FF4B4B?logo=streamlit&logoColor=white)
 ![Plotly](https://img.shields.io/badge/Plotly-Express-3F4F75?logo=plotly&logoColor=white)
@@ -92,7 +93,7 @@ O pipeline segue um fluxo lógico desacoplado e modular com arquitetura ponta a 
                        [regras_fornecedores.py] (nota, classe e alternativas)
                                                                    │
                                                                    ▼ (SQLAlchemy / Context Injection)
-                                  [Streamlit Community Cloud] ◀──▶ [Google Gemini API]
+                                  [Streamlit Community Cloud] ◀──▶ [Google Gemini API → reserva Groq]
                                   (estoque-dashboard-live.streamlit.app)   (GenAI / SDK google-genai)
 ```
 
@@ -105,7 +106,7 @@ Todas as etapas acima são executadas em sequência pelo orquestrador `pipeline_
 | **Linguagem & Manipulação** | Python 3.11+, Pandas | Engenharia de dados, profiling exploratório, pipeline de ETL e cálculo de KPIs |
 | **Banco de Dados (Cloud)** | **Neon PostgreSQL (Cloud)** | Data Warehouse relacional serverless em nuvem com modelagem dimensional (*Star Schema*) |
 | **Conectividade & ORM** | SQLAlchemy, psycopg2-binary | Gerenciamento de engine, pool de conexões e execução transacional segura |
-| **Inteligência Artificial (GenAI)** | **Google Gemini (3.8 Flash)**, `google-genai` | Assistente virtual de suprimentos, recomendação multicritério de compras e resiliência em cascata |
+| **Inteligência Artificial (GenAI)** | **Google Gemini (3.8 Flash)**, `google-genai`, **Groq** (reserva gratuita, `httpx`) | Assistente virtual de suprimentos, recomendação multicritério de compras e resiliência em cascata |
 | **Dashboard & Visualização Interativa** | Streamlit, Plotly, CSS customizado | Aplicação analítica com 6 abas, filtros dinâmicos, tema claro/escuro, animações e layout responsivo para celular |
 | **Deploy & Hospedagem em Nuvem** | **Streamlit Community Cloud** | Hospedagem contínua, CI/CD integrado ao GitHub e disponibilização pública da aplicação |
 | **Visualização Executiva** | Matplotlib, Seaborn | Geração de gráficos estáticos em alta resolução (300 DPI) para relatórios |
@@ -151,7 +152,7 @@ pipeline-analise-estoque-python/
 ├── consultar_banco.py                     # Auditoria pós-carga e consultas SQL analíticas
 ├── pipeline_completo.py                   # Orquestrador mestre automatizado de ponta a ponta
 │
-├── assistente_estoque.py                  # Módulo de IA: Chatbot e inteligência de compras com Google Gemini
+├── assistente_estoque.py                  # Módulo de IA: Chatbot e inteligência de compras com Google Gemini (reserva Groq)
 ├── app.py                                 # Ponto de entrada do painel Streamlit (filtros, KPIs e abas)
 ├── dashboard/                             # Módulos do painel Streamlit
 │   ├── dados.py                           # Conexão com cache, retry e consultas analíticas
@@ -309,7 +310,9 @@ Além de preço e prazo, o projeto avalia **o histórico de problemas** de cada 
 
 ---
 
-## 🤖 Assistente de IA & Inteligência de Compras (Google Gemini)
+## 🤖 Assistente de IA & Inteligência de Compras (Google Gemini + reserva Groq)
+
+> **Reserva gratuita:** se todos os modelos do Gemini falharem (cota esgotada ou instabilidade), a pergunta vai automaticamente para o **Groq** (`gpt-oss-120b` → `gpt-oss-20b` → `qwen3-32b`) com um contexto enxuto, que cabe no limite de tokens do plano gratuito. Cada resposta mostra qual IA respondeu. A reserva é opcional: basta configurar `GROQ_API_KEY`.
 
 O projeto integra um assistente inteligente de ponta a ponta (`assistente_estoque.py`) alimentado pelo **Google Gemini** (modelo padrão `gemini-3.8-flash`), atuando como um consultor executivo sênior de *Supply Chain & Procurement Analytics*. A ferramenta transforma o painel estático em um copiloto de compras proativo, capaz de analisar a saúde dos estoques, cruzar cotações de fornecedores e formular estratégias de mitigação de rupturas com respostas embasadas nos dados reais do banco, injetados no contexto a cada consulta.
 
@@ -439,6 +442,9 @@ DATABASE_URL="postgresql://<usuario>:<senha>@<host>/<database>?sslmode=require"
 
 # Chave de API do Google Gemini (obtenha em: https://aistudio.google.com/app/apikey)
 GEMINI_API_KEY="AIzaSy..."
+
+# (Opcional) Reserva gratuita do Groq (obtenha em: https://console.groq.com/keys)
+GROQ_API_KEY="gsk_..."
 ```
 
 #### Opção B: Configuração via `.streamlit/secrets.toml` (Streamlit Local e Nuvem)
