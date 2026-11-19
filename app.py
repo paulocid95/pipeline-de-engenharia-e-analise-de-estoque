@@ -10,7 +10,7 @@ import pandas as pd
 import streamlit as st
 
 from assistente_estoque import renderizar_interface_chat
-from dashboard import aba_compras, aba_fornecedores, aba_ranking, aba_tabela, aba_visao_geral
+from dashboard import aba_compras, aba_fornecedores, aba_ranking, aba_tabela, aba_visao_geral, pagina_inicial
 from dashboard.dados import (
     carregar_dados_analiticos,
     carregar_dados_cotacoes,
@@ -32,6 +32,16 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="auto",
 )
+
+# Página inicial (apresentação) até o visitante escolher abrir a demonstração
+if st.query_params.get("tela") != "painel":
+    pagina_inicial.renderizar()
+    st.stop()
+
+
+def _voltar_ao_inicio() -> None:
+    st.query_params.pop("tela", None)
+
 
 aplicar_estilo()
 
@@ -112,6 +122,8 @@ valor_medio_sku = (valor_total / total_skus) if total_skus else 0
 chips = [f"📦 {len(df)} SKUs monitorados"]
 if not df.empty and "data_carga" in df.columns:
     chips.insert(0, f"🕒 Última carga: {pd.to_datetime(df['data_carga'].max()).strftime('%d/%m/%Y %H:%M')}")
+
+st.button("← Voltar ao início", type="tertiary", on_click=_voltar_ao_inicio)
 
 cabecalho(
     titulo="Monitoramento e Gestão Analítica de Estoque",
