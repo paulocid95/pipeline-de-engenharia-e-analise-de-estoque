@@ -6,7 +6,7 @@ import streamlit as st
 
 from dashboard.formatacao import formatar_moeda_brl
 from dashboard.graficos import cor_fornecedor, exibir_grafico
-from regras_fornecedores import ICONE_CLASSE, motivo_derrota, opcoes_por_produto
+from regras_fornecedores import ICONE_CLASSE, ROTULO_CLASSE, motivo_derrota, opcoes_por_produto
 
 
 def _fmt_dias(valor) -> str:
@@ -20,6 +20,8 @@ def _sem_quebra(texto: str) -> str:
 
 def _linha_opcao(rotulo: str, opcao: pd.Series, diferenca: str = "", observacao: str = "—") -> str:
     classe = _sem_quebra(f"{ICONE_CLASSE[opcao['classe']]} {opcao['fornecedor_cotacao']}")
+    if opcao["classe"] == "PERIGOSO":
+        classe += " **(não recomendado)**"
     preco = _sem_quebra(formatar_moeda_brl(float(opcao["preco_cotado"])))
     return (
         f"| {rotulo} | {classe} | {preco} | {_sem_quebra(_fmt_dias(opcao['prazo_dias']))} | "
@@ -36,7 +38,7 @@ def _detalhe_produto(opcoes: dict) -> str:
         "| :--- | :--- | ---: | ---: | ---: | ---: | :--- | :--- |",
         _linha_opcao("✅ **Melhor opção**", melhor, observacao="Melhor equilíbrio entre preço, prazo, lote e confiabilidade"),
     ]
-    rotulos = {"mais_barato": "💰 Mais barato", "mais_rapido": "⚡ Mais rápido", "menor_lote": "📦 Menor lote"}
+    rotulos = {"mais_barato": "💰 Mais barato", "mais_rapido": "🚚💨 Mais rápido", "menor_lote": "📦 Menor lote"}
     for criterio, rotulo in rotulos.items():
         alt = opcoes[criterio]
         if alt is None:
@@ -50,6 +52,55 @@ def _detalhe_produto(opcoes: dict) -> str:
             diferenca = f"−{int(melhor['lote_minimo'] - alt['lote_minimo'])} un"
         linhas.append(_linha_opcao(rotulo, alt, diferenca, motivo_derrota(alt, melhor)))
     return "\n".join(linhas)
+
+
+# Critério isolado -> como aparece na coluna "Outras opções"
+ROTULOS_CRITERIO = {"mais_barato": "💰 Mais barato", "mais_rapido": "🚚💨 Mais rápido", "menor_lote": "📦 Menor lote"}
+_FUNDO_PERIGOSO = "background-color: rgba(239, 68, 68, 0.18)"
+
+
+def _outras_opcoes(op: dict) -> str:
+    """Em quais critérios outro fornecedor vence a melhor opção (ou — se ela vence em tudo)."""
+    return " · ".join(rotulo for criterio, rotulo in ROTULOS_CRITERIO.items() if op[criterio] is not None) or "—"
+
+
+def _todas_as_ofertas(cotacoes: pd.DataFrame) -> None:
+    """Todas as propostas do produto, da maior para a menor nota. As 🔴 ficam em vermelho e com o motivo."""
+    tabela = cotacoes.sort_values(["nota_cotacao", "preco_cotado"], ascending=[False, True])
+    perigosas = tabela["classe"].eq("PERIGOSO").tolist()
+    exibicao = pd.DataFrame({
+        "Classe": [
+            "🔴 NÃO RECOMENDADO" if c == "PERIGOSO" else f"{ICONE_CLASSE.get(c, '⚪')} {ROTULO_CLASSE.get(c, 'Sem avaliação')}"
+            for c in tabela["classe"]
+        ],
+        "Fornecedor": tabela["fornecedor_cotacao"].tolist(),
+        "Nota": tabela["nota_cotacao"].round(0).tolist(),
+        "Preço": tabela["preco_cotado"].tolist(),
+        "Prazo": tabela["prazo_dias"].tolist(),
+        "Lote mín.": tabela["lote_minimo"].tolist(),
+        "Situação do fornecedor": tabela["motivo"].fillna("—").tolist(),
+    })
+    estilo = exibicao.style.apply(
+        lambda linha: [_FUNDO_PERIGOSO if perigosas[linha.name] else ""] * len(linha), axis=1,
+    )
+    st.dataframe(
+        estilo,
+        column_config={
+            "Nota": st.column_config.NumberColumn(format="%.0f"),
+            "Preço": st.column_config.NumberColumn(format="R$ %.2f"),
+            "Prazo": st.column_config.NumberColumn(format="%d dias"),
+            "Lote mín.": st.column_config.NumberColumn(format="%d un"),
+            "Situação do fornecedor": st.column_config.TextColumn(width="large"),
+        },
+        hide_index=True,
+        width="stretch",
+    )
+    if any(perigosas):
+        st.error(
+            f"🔴 **{sum(perigosas)} oferta(s) de fornecedor Perigoso.** Aparecem aqui só para comparação: "
+            "o histórico deles (processos, problemas críticos sem solução ou nota baixa) torna a compra arriscada, "
+            "mesmo quando o preço ou o prazo parecem melhores."
+        )
 
 
 def _simulador_recompra(df_cot_filtrado: pd.DataFrame, df_cot_avaliado: pd.DataFrame) -> None:
@@ -86,7 +137,7 @@ def _simulador_recompra(df_cot_filtrado: pd.DataFrame, df_cot_avaliado: pd.DataF
             "preco": melhor["preco_cotado"],
             "prazo": melhor["prazo_dias"],
             "lote": melhor["lote_minimo"],
-            "alternativas": f"⚠️ {qtd_alt}" if qtd_alt else "—",
+            "alternativas": _outras_opcoes(op),
         })
 
     if com_alternativas:
@@ -112,19 +163,33 @@ def _simulador_recompra(df_cot_filtrado: pd.DataFrame, df_cot_avaliado: pd.DataF
             "preco": st.column_config.NumberColumn("Preço", format="R$ %.2f"),
             "prazo": st.column_config.NumberColumn("Prazo", format="%d dias"),
             "lote": st.column_config.NumberColumn("Lote mín.", format="%d un"),
-            "alternativas": st.column_config.TextColumn("Alternativas"),
+            "alternativas": st.column_config.TextColumn(
+                "Outras opções",
+                help="Critérios em que outro fornecedor vence a melhor opção (mais barato, mais rápido ou menor "
+                     "lote). “—” = a melhor opção já vence em tudo. Detalhes em “Comparação por produto”.",
+            ),
         },
         hide_index=True,
         width="stretch",
     )
 
-    if com_alternativas:
-        st.markdown("###### 🔍 Comparação por produto")
-        for sku, op in sorted(com_alternativas, key=lambda item: str(item[1]["melhor"]["nome_produto"])):
-            melhor = op["melhor"]
-            qtd = sum(op[c] is not None for c in ("mais_barato", "mais_rapido", "menor_lote"))
-            with st.expander(f"{melhor['nome_produto']} · {qtd} alternativa(s)"):
+    st.markdown("###### 🔍 Comparação por produto")
+    st.caption("Todas as ofertas de cada produto em risco, inclusive as de fornecedores 🔴 Perigosos (em vermelho).")
+    for sku, op in sorted(opcoes.items(), key=lambda item: str(item[1]["melhor"]["nome_produto"])):
+        melhor = op["melhor"]
+        ofertas = cotacoes[cotacoes["sku"] == sku]
+        perigosas = int(ofertas["classe"].eq("PERIGOSO").sum())
+        titulo = f"{melhor['nome_produto']} · {len(ofertas)} oferta(s)"
+        if perigosas:
+            titulo += f" · 🔴 {perigosas} não recomendada(s)"
+        with st.expander(titulo):
+            if any(op[c] is not None for c in ROTULOS_CRITERIO):
                 st.markdown(_detalhe_produto(op))
+            else:
+                st.markdown(f"✅ **{melhor['fornecedor_cotacao']}** é a melhor opção e também a mais barata, "
+                            "a mais rápida e a de menor lote.")
+            st.markdown("**Todas as ofertas**")
+            _todas_as_ofertas(ofertas)
 
 
 def renderizar_cabecalho() -> None:
@@ -250,7 +315,7 @@ def renderizar(df_cot_filtrado: pd.DataFrame, df_cot_avaliado: pd.DataFrame) -> 
             # 3 Cards de Síntese Executiva no Topo
             kpi1, kpi2, kpi3 = st.columns(3)
             kpi1.metric(
-                "⚡ Líder em Agilidade (Menor Prazo)",
+                "🚚💨 Líder em Agilidade (Menor Prazo)",
                 f"{mais_agil['fornecedor_cotacao']}",
                 f"{mais_agil['prazo_medio']:.1f} dias médios",
                 delta_color="normal"
