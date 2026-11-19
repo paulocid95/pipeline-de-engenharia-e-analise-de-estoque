@@ -10,7 +10,7 @@ import pandas as pd
 import streamlit as st
 
 from assistente_estoque import renderizar_interface_chat
-from dashboard import aba_compras, aba_fornecedores, aba_ranking, aba_tabela, aba_visao_geral, pagina_inicial
+from dashboard import aba_compras, aba_fornecedores, aba_ranking, aba_tabela, aba_visao_geral, pagina_envio, pagina_inicial
 from dashboard.dados import (
     carregar_dados_analiticos,
     carregar_dados_cotacoes,
@@ -33,8 +33,12 @@ st.set_page_config(
     initial_sidebar_state="auto",
 )
 
-# Página inicial (apresentação) até o visitante escolher abrir a demonstração
-if st.query_params.get("tela") != "painel":
+# Página inicial (apresentação) até o visitante escolher a demonstração ou enviar a própria planilha
+tela = st.query_params.get("tela")
+if tela == "envio":
+    pagina_envio.renderizar()
+    st.stop()
+if tela != "painel":
     pagina_inicial.renderizar()
     st.stop()
 

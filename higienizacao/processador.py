@@ -195,15 +195,20 @@ def higienizar(
     variantes = [v for t in brutos.values() if t is not None for v in t["fornecedor"] if not vazio(v)]
     chaves = sorted({ent.chave_fornecedor(v) for v in variantes} - {""})
     exibicao = {k: ent.nome_de_exibicao(k, variantes) for k in chaves}
+    uso = {k: 0 for k in chaves}
+    for v in variantes:
+        uso[ent.chave_fornecedor(v)] = uso.get(ent.chave_fornecedor(v), 0) + 1
     pares_unidos = []
     for i, a in enumerate(chaves):
         for b in chaves[i + 1:]:
             sim = ent.parecidos(a, b)
             if sim:
-                duvida = Duvida("fornecedor", exibicao[b], exibicao[a], round(sim, 2))
+                # O nome mais usado (e, no empate, o mais completo) é o que fica
+                fica, sai = sorted((a, b), key=lambda k: (uso[k], len(k)), reverse=True)
+                duvida = Duvida("fornecedor", exibicao[sai], exibicao[fica], round(sim, 2))
                 res.duvidas.append(duvida)
                 if decisoes.get(duvida.chave):
-                    pares_unidos.append((a, b))
+                    pares_unidos.append((fica, sai))
     destino = _uniao(pares_unidos)
 
     def fornecedor(valor) -> str:

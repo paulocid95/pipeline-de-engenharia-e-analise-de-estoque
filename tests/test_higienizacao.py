@@ -229,7 +229,12 @@ def test_fornecedores_parecidos_so_sao_unidos_com_confirmacao():
     assert len(r.duvidas) == 1 and r.duvidas[0].tipo == "fornecedor"
     assert r.cotacoes["fornecedor_cotacao"].nunique() == 2
     r2 = _limpar_csvs(("estoque.csv", estoque), ("cotacoes.csv", cotacoes), decisoes={r.duvidas[0].chave: True})
-    assert r2.cotacoes["fornecedor_cotacao"].nunique() == 1
+    assert r2.cotacoes["fornecedor_cotacao"].tolist() == ["Malharia Esperanca"]   # fica o nome mais completo
+
+
+def test_nome_de_empresa_com_cia_e_sufixo_ltda():
+    assert nome_de_exibicao(chave_fornecedor("Jeans & Cia"), ["Jeans & Cia"]) == "Jeans & Cia"
+    assert nome_de_exibicao(chave_fornecedor("Malharia Sul LTDA"), ["Malharia Sul LTDA", "MALHARIA SUL"]) == "Malharia Sul"
 
 
 def test_cotacoes_sem_prazo_e_lote_recebem_valores_padrao():

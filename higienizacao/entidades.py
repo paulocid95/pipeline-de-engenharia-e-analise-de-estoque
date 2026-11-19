@@ -1,5 +1,6 @@
 """Unificação de nomes (fornecedores, produtos, categorias) e tradução de ocorrências para os códigos do sistema."""
 
+import re
 from difflib import SequenceMatcher
 
 from limpeza_padronizacao import deduzir_categoria
@@ -10,7 +11,8 @@ from .texto import limpar_texto, melhor_variante, normalizar
 # ------------------------------------------------------------------------------
 # Fornecedores
 # ------------------------------------------------------------------------------
-_SUFIXOS_EMPRESA = {"ltda", "me", "mei", "eireli", "epp", "sa", "s a", "cia", "inc", "llc", "ltd"}
+_SUFIXOS_EMPRESA = {"ltda", "me", "mei", "eireli", "epp", "sa", "s a", "inc", "llc", "ltd"}
+_SUFIXO_FINAL = re.compile(r"[\s,.\-]+(ltda|me|mei|eireli|epp|s\.?\s?a|inc|llc|ltd)\.?$", re.IGNORECASE)
 _ABREVIACOES = {"forn": "fornecedor", "fornec": "fornecedor", "fornecedora": "fornecedor",
                 "distrib": "distribuidora", "dist": "distribuidora", "com": "comercio", "ind": "industria"}
 _PALAVRAS_GENERICAS = {"fornecedor", "distribuidora", "comercio", "industria", "de", "da", "do", "e", "the"}
@@ -28,7 +30,7 @@ def chave_fornecedor(nome) -> str:
 
 def nome_de_exibicao(chave: str, variantes) -> str:
     """Nome bonito do fornecedor: a melhor grafia original, sem sufixos como LTDA."""
-    candidatas = [v for v in variantes if chave_fornecedor(v) == chave]
+    candidatas = [_SUFIXO_FINAL.sub("", limpar_texto(v)) for v in variantes if chave_fornecedor(v) == chave]
     melhor = melhor_variante(candidatas)
     bem_escrito = melhor and melhor != melhor.upper() and melhor != melhor.lower() and "_" not in melhor
     if bem_escrito and normalizar(melhor) == chave:

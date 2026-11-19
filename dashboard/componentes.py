@@ -5,9 +5,11 @@ from html import escape
 import streamlit as st
 
 
-def cabecalho(titulo: str, texto: str, conectado: bool, chips: list[str]) -> None:
-    """Renderiza o cabeçalho com gradiente, status da conexão e etiquetas de contexto."""
-    if conectado:
+def cabecalho(titulo: str, texto: str, conectado: bool | None, chips: list[str]) -> None:
+    """Renderiza o cabeçalho com gradiente, status da conexão (None = sem status) e etiquetas de contexto."""
+    if conectado is None:
+        status = ""
+    elif conectado:
         status = '<span class="chip"><i class="pulso"></i>Ao vivo · PostgreSQL (Neon)</span>'
     else:
         status = '<span class="chip"><i class="pulso pulso--offline"></i>Snapshot local de contingência</span>'

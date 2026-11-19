@@ -58,6 +58,10 @@ def _abrir_demonstracao() -> None:
     st.query_params["tela"] = "painel"
 
 
+def _abrir_envio() -> None:
+    st.query_params["tela"] = "envio"
+
+
 FUNDO = """
 <style>__CSS__</style>
 <div id="si-fundo">
@@ -202,24 +206,6 @@ RODAPE = f"""
 """
 
 
-@st.dialog("📤 Analisar minha planilha", width="large")
-def _dialogo_upload() -> None:
-    st.markdown(
-        "**Aceitamos Excel (.xlsx) ou CSV**, até 5 MB e 10 mil linhas por arquivo. "
-        "Envie do jeito que o arquivo sai do seu sistema: nós cuidamos da limpeza."
-    )
-    st.markdown(
-        "| Dado | Colunas obrigatórias | Opcionais | O que libera |\n"
-        "| :--- | :--- | :--- | :--- |\n"
-        "| 📦 **Estoque** (obrigatório) | produto, quantidade, preço | sku, categoria, fornecedor, estoque_minimo | Visão geral, alertas, tabela, IA |\n"
-        "| 💰 **Cotações** | produto, fornecedor, preço | prazo_dias, lote_minimo | Fornecedores e simulador de compras |\n"
-        "| ⚠️ **Ocorrências** | fornecedor, tipo, data | gravidade, status, data_resolucao | Ranking & Risco |\n"
-        "| 📈 **Vendas** | produto, data, quantidade_vendida | — | Previsão de demanda |"
-    )
-    st.info("💡 Na dúvida, baixe a **planilha de exemplo** e use como base. Seus dados ficam só na sua sessão.")
-    st.warning("🚧 O envio de planilhas está em construção e chega na próxima atualização. Enquanto isso, explore a demonstração.")
-
-
 def renderizar() -> None:
     """Desenha a página inicial completa."""
     _html(FUNDO.replace("__CSS__", _arquivo("estilo.css")).replace("__JS__", _script(_arquivo("efeitos.js"))))
@@ -238,8 +224,8 @@ def renderizar() -> None:
                 on_click="ignore",
                 help="Excel com estoque, cotações, ocorrências e vendas da demonstração, bagunçados de propósito",
             )
-            if st.button("📤 Analisar minha planilha", help="Veja o que sua planilha precisa ter"):
-                _dialogo_upload()
+            st.button("📤 Analisar minha planilha", on_click=_abrir_envio,
+                      help="Envie seu Excel ou CSV: nós limpamos e analisamos")
         _html(HEROI_SELOS)
     with painel:
         _html(HEROI_PAINEL)
