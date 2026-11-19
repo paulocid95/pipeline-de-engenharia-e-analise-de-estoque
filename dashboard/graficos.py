@@ -1,5 +1,7 @@
 """Tema único dos gráficos Plotly e paletas de cores do painel."""
 
+import zlib
+
 import plotly.graph_objects as go
 import streamlit as st
 
@@ -20,6 +22,14 @@ CORES_FORNECEDOR = {
     "Fornecedor E": "#d55181",  # magenta
     "Fornecedor F": "#9085e9",  # violeta
 }
+_PALETA_FORNECEDOR = list(CORES_FORNECEDOR.values())
+
+
+def cor_fornecedor(nome: str) -> str:
+    """Cor fixa de cada fornecedor. Nomes de planilhas enviadas recebem uma cor estável da mesma paleta."""
+    if nome in CORES_FORNECEDOR:
+        return CORES_FORNECEDOR[nome]
+    return _PALETA_FORNECEDOR[zlib.crc32(str(nome).encode("utf-8")) % len(_PALETA_FORNECEDOR)]
 
 COR_DESTAQUE = "#2563eb"
 COR_NEUTRA = "#94a3b8"

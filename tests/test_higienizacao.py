@@ -298,3 +298,73 @@ def test_arquivo_grande_ou_formato_errado_gera_erro_amigavel():
     linhas = "Produto;Qtd;Preço\n" + "x;1;1\n" * 10_100
     with pytest.raises(ErroArquivo, match="limite"):
         ler_arquivo("grande.csv", _csv(linhas))
+
+
+# ------------------------------------------------------------------------------
+# Planilha limpa para download
+# ------------------------------------------------------------------------------
+def test_planilha_higienizada_pode_ser_enviada_de_novo():
+    from higienizacao.exportacao import planilha_higienizada
+
+    arquivo = montar_planilha_exemplo(EST_DEMO, COT_DEMO, OC_DEMO, HOJE, seed=42)
+    r = higienizar(preparar(ler_arquivo("exemplo.xlsx", arquivo)), hoje=HOJE)
+    limpa = planilha_higienizada(r)
+
+    entradas = preparar(ler_arquivo("limpa.xlsx", limpa))
+    assert [e.tipo for e in entradas] == ["estoque", "cotacoes", "ocorrencias", "vendas", None]
+    entradas = [e for e in entradas if e.tipo]
+    r2 = higienizar(entradas, hoje=HOJE)
+    assert r2.ok and not r2.pendencias and not r2.descartes and not r2.duvidas
+
+    colunas_est = ["sku", "nome_produto", "nome_categoria", "fornecedor", "preco_unitario", "quantidade_disponivel",
+                   "status_reposicao"]
+    pd.testing.assert_frame_equal(r2.estoque[colunas_est].sort_values("sku", ignore_index=True),
+                                  r.estoque[colunas_est].sort_values("sku", ignore_index=True))
+    colunas_cot = ["sku", "fornecedor_cotacao", "preco_cotado", "prazo_dias", "lote_minimo", "data_cotacao"]
+    pd.testing.assert_frame_equal(r2.cotacoes[colunas_cot].sort_values(["sku", "fornecedor_cotacao"], ignore_index=True),
+                                  r.cotacoes[colunas_cot].sort_values(["sku", "fornecedor_cotacao"], ignore_index=True))
+    colunas_oc = ["fornecedor", "tipo", "gravidade", "status", "data_ocorrencia", "data_resolucao"]
+    ordem = ["data_ocorrencia", "fornecedor", "tipo"]
+    pd.testing.assert_frame_equal(r2.ocorrencias[colunas_oc].sort_values(ordem, ignore_index=True),
+                                  r.ocorrencias[colunas_oc].sort_values(ordem, ignore_index=True))
+    assert r2.vendas["quantidade_vendida"].sum() == r.vendas["quantidade_vendida"].sum()
+
+
+def test_planilha_higienizada_so_com_estoque():
+    from higienizacao.exportacao import planilha_higienizada
+
+    r = _limpar_csvs(("estoque.csv", _csv("Produto;Qtd;Preço\nCaneta;10;2,50\nLápis;0;1,00\n")))
+    abas = pd.ExcelFile(__import__("io").BytesIO(planilha_higienizada(r))).sheet_names
+    assert abas[0] == "Estoque" and "Cotações" not in abas
+
+
+# ------------------------------------------------------------------------------
+# Assistente de IA com os dados da planilha
+# ------------------------------------------------------------------------------
+def test_contexto_da_ia_com_planilha_completa():
+    from assistente_estoque import dados_planilha_para_contexto, montar_contexto
+
+    arquivo = montar_planilha_exemplo(EST_DEMO, COT_DEMO, OC_DEMO, HOJE, seed=42)
+    r = higienizar(preparar(ler_arquivo("exemplo.xlsx", arquivo)), hoje=HOJE)
+    texto = montar_contexto(*dados_planilha_para_contexto(r.estoque, r.cotacoes, r.ocorrencias), HOJE,
+                            origem="PLANILHA ENVIADA PELO USUÁRIO")
+    assert "PLANILHA ENVIADA PELO USUÁRIO" in texto and "Fornecedor D" in texto and "MELHOR OPÇÃO GERAL" in texto
+
+
+def test_contexto_da_ia_so_com_estoque_e_estoque_minimo_vazio():
+    from assistente_estoque import dados_planilha_para_contexto, montar_contexto
+
+    r = _limpar_csvs(("estoque.csv", _csv("Produto;Qtd;Preço;Estoque mínimo\nCaneta;0;2,50;\nLápis;3;1,00;5\n")))
+    texto = montar_contexto(*dados_planilha_para_contexto(r.estoque, r.cotacoes, r.ocorrencias), HOJE)
+    assert "Caneta" in texto and "Estoque Mínimo = 0 un" in texto and "Ranking indisponível" in texto
+
+
+def test_ranking_sem_historico_nao_diz_que_o_historico_e_limpo():
+    r = _limpar_csvs(
+        ("estoque.csv", _csv("Produto;Qtd;Preço\nCaneta;0;2,50\n")),
+        ("cotacoes.csv", _csv("Produto;Fornecedor;Preço\nCaneta;Papelaria Sol;2,00\nCaneta;Atacado Lua;2,20\n")),
+    )
+    ranking = ranking_fornecedores(r.cotacoes, pd.DataFrame(columns=r.cotacoes.columns[:0].tolist() + [
+        "fornecedor", "tipo", "gravidade", "data_ocorrencia", "status", "data_resolucao"]), HOJE,
+        chave_produto="sku", coluna_fornecedor="fornecedor_cotacao")
+    assert ranking["motivo"].str.startswith("Sem histórico de ocorrências").all()

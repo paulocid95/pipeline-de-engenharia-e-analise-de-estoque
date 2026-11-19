@@ -5,6 +5,41 @@ from html import escape
 import streamlit as st
 
 
+# O que falta enviar para liberar cada parte do painel (planilhas enviadas pelo usuário)
+_FALTA = {
+    "cotacoes": ("💰", "Cotações", "produto (ou SKU), fornecedor e preço", "prazo de entrega e lote mínimo"),
+    "ocorrencias": ("⚠️", "Ocorrências", "fornecedor, tipo do problema e data", "gravidade, situação e data de resolução"),
+    "fornecedor": ("🏭", "coluna Fornecedor no Estoque", "o fornecedor de cada produto", ""),
+}
+
+
+def aviso_dados_faltando(tipo: str, motivo: str, chave: str | None = None) -> None:
+    """Explica o que falta na planilha enviada para liberar esta parte do painel."""
+    icone, nome, obrigatorias, opcionais = _FALTA[tipo]
+    extra = f'<br><span class="falta-opc">Opcional: {escape(opcionais)}.</span>' if opcionais else ""
+    st.markdown(
+        f'<div class="falta"><div class="falta-icone">{icone}</div><div>'
+        f'<div class="falta-titulo">Falta {"a" if tipo == "fornecedor" else "uma aba de"} {escape(nome)}</div>'
+        f'<p>{escape(motivo)}</p>'
+        f'<p>Inclua: <strong>{escape(obrigatorias)}</strong>.{extra}</p>'
+        "</div></div>",
+        unsafe_allow_html=True,
+    )
+    from dashboard.pagina_envio import enviar_outra_planilha
+    st.button("📤 Enviar outra planilha", key=chave or f"falta_{tipo}", on_click=enviar_outra_planilha)
+
+
+def aviso_ia_privacidade(provedores: list[str]) -> None:
+    """Frase de destaque: nada fica guardado no app, quem processa é a IA externa (Gemini, Groq...)."""
+    nomes = " ou ".join(f"<b>{escape(p)}</b>" for p in provedores)
+    st.markdown(
+        '<div class="ia-aviso"><span class="ia-aviso-icone">🔒</span>'
+        '<span class="ia-aviso-texto">Não guardamos <b>nenhum dado</b> nem <b>histórico de conversas</b>: '
+        f"suas perguntas e um resumo dos seus dados são processados direto pelo {nomes}.</span></div>",
+        unsafe_allow_html=True,
+    )
+
+
 def cabecalho(titulo: str, texto: str, conectado: bool | None, chips: list[str]) -> None:
     """Renderiza o cabeçalho com gradiente, status da conexão (None = sem status) e etiquetas de contexto."""
     if conectado is None:
@@ -71,14 +106,14 @@ def cartoes_fornecedores(ranking) -> None:
 
     `ranking` vem de regras_fornecedores.ranking_fornecedores.
     """
-    from dashboard.graficos import CORES_FORNECEDOR
+    from dashboard.graficos import cor_fornecedor
     from regras_fornecedores import ICONE_CLASSE, ROTULO_CLASSE
 
     blocos = []
     for posicao, linha in enumerate(ranking.itertuples(), start=1):
         classe = str(linha.classe).lower()
         nota = float(linha.nota_final)
-        cor = CORES_FORNECEDOR.get(linha.fornecedor, "#64748b")
+        cor = cor_fornecedor(linha.fornecedor)
         sem_solucao = int(linha.sem_solucao)
         meta = f"#{posicao} no ranking · {int(linha.ocorrencias_12m)} ocorrências em 12 meses"
         if sem_solucao:

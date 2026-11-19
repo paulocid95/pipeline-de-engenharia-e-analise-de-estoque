@@ -442,6 +442,58 @@ section[data-testid="stSidebar"] { border-right: 1px solid var(--borda); }
     .stButton button, .stDownloadButton button { min-height: 44px; }
 }
 
+/* Aviso de dados faltando (planilha enviada sem alguma aba) */
+.falta {
+    display: flex; gap: 14px; align-items: flex-start;
+    padding: 16px 18px; margin: 4px 0 10px;
+    border: 1px dashed var(--borda); border-left: 4px solid var(--marca);
+    border-radius: 14px; background: var(--superficie);
+    animation: surgir .5s ease both;
+}
+.falta-icone { font-size: 1.7rem; line-height: 1; }
+.falta-titulo { font-weight: 700; font-size: 1.02rem; margin-bottom: 4px; }
+.falta p { margin: 0 0 4px; font-size: .93rem; }
+.falta-opc { opacity: .75; font-size: .88rem; }
+
+/* Frase de privacidade do assistente de IA */
+@keyframes ia-borda { to { --ia-giro: 360deg; } }
+@keyframes ia-brilho { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+@keyframes ia-cadeado {
+    0%, 100% { transform: rotate(0) scale(1); }
+    10% { transform: rotate(-14deg) scale(1.15); }
+    20% { transform: rotate(12deg) scale(1.15); }
+    30% { transform: rotate(0) scale(1); }
+}
+@property --ia-giro { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+.ia-aviso {
+    position: relative; isolation: isolate; display: flex; align-items: center; gap: 14px;
+    padding: 16px 20px; margin: 6px 0 18px; border-radius: 16px;
+    background: var(--superficie);
+    box-shadow: 0 10px 34px -14px rgba(124, 58, 237, .55);
+    animation: surgir .6s ease both;
+}
+/* Borda em gradiente girando: a máscara deixa o gradiente só na borda, o fundo segue o tema */
+.ia-aviso::before {
+    content: ""; position: absolute; inset: 0; z-index: -1; padding: 2px; border-radius: inherit;
+    background: conic-gradient(from var(--ia-giro), #2563eb, #7c3aed, #ec4899, #f59e0b, #10b981, #2563eb);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor; mask-composite: exclude;
+    animation: ia-borda 4s linear infinite; pointer-events: none;
+}
+.ia-aviso-icone { font-size: 1.9rem; animation: ia-cadeado 3s ease-in-out infinite; }
+.ia-aviso-texto {
+    font-size: 1.08rem; font-weight: 600; line-height: 1.45;
+    background: linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899, #8b5cf6, #3b82f6);
+    background-size: 300% 100%;
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    animation: ia-brilho 6s ease-in-out infinite;
+}
+.ia-aviso-texto b { font-weight: 800; }
+@media (max-width: 640px) {
+    .ia-aviso { padding: 13px 14px; gap: 10px; }
+    .ia-aviso-texto { font-size: .96rem; }
+}
+
 /* Respeita quem prefere menos movimento */
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation: none !important; transition: none !important; }

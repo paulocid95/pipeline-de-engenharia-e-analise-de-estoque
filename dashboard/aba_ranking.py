@@ -6,8 +6,8 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from dashboard.componentes import cartoes_fornecedores
-from dashboard.graficos import CORES_FORNECEDOR, exibir_grafico
+from dashboard.componentes import aviso_dados_faltando, cartoes_fornecedores
+from dashboard.graficos import cor_fornecedor, exibir_grafico
 from regras_fornecedores import (
     ICONE_CLASSE,
     LIMITE_BOM,
@@ -78,21 +78,26 @@ def _tabela_ranking(ranking: pd.DataFrame) -> None:
 def _grafico_tipos(ocorrencias: pd.DataFrame, ordem_fornecedores: list[str]) -> None:
     """Mapa de calor: quantas ocorrências de cada tipo cada fornecedor teve em 12 meses."""
     no_periodo = ocorrencias[ocorrencias["penalidade"] > 0]
-    # Tipos nas linhas (rótulos legíveis na horizontal) e fornecedores nas colunas, pela letra
+    # "Outros problemas" só aparece quando alguma ocorrência caiu nele (tipos que não reconhecemos)
+    tipos = [rotulo for codigo, rotulo in ROTULOS_TIPO.items()
+             if codigo != "OUTROS" or (no_periodo["tipo"] == "OUTROS").any()]
+    # Tipos nas linhas (rótulos legíveis na horizontal) e fornecedores nas colunas
     contagem = (
         no_periodo.assign(tipo_rotulo=no_periodo["tipo"].map(ROTULOS_TIPO))
         .pivot_table(index="tipo_rotulo", columns="fornecedor", values="tipo", aggfunc="count", fill_value=0)
-        .reindex(index=list(ROTULOS_TIPO.values()), columns=ordem_fornecedores, fill_value=0)
+        .reindex(index=tipos, columns=ordem_fornecedores, fill_value=0)
     )
-    letras = [f.replace("Fornecedor ", "") for f in contagem.columns]
+    # Na demonstração os fornecedores aparecem só pela letra (A, B, C...)
+    curtos = [f.removeprefix("Fornecedor ") if f.startswith("Fornecedor ") and len(f) <= 13 else f
+              for f in contagem.columns]
     fig = go.Figure(go.Heatmap(
         z=contagem.where(contagem > 0).values,  # zero fica em branco
-        x=letras,
+        x=curtos,
         y=contagem.index,
         text=[[str(v) if v else "" for v in linha] for linha in contagem.values],
         texttemplate="%{text}",
         textfont=dict(size=13),
-        customdata=[[f"Fornecedor {letra}" for letra in letras]] * len(contagem),
+        customdata=[list(contagem.columns)] * len(contagem),
         # Rampa sólida de um só tom (claro = poucas, escuro = muitas): cores opacas deixam o
         # Plotly escolher texto preto ou branco com bom contraste nos modos claro e escuro
         colorscale=[[0, "#86b6ef"], [0.5, "#3987e5"], [1, "#184f95"]],
@@ -114,7 +119,7 @@ def _grafico_resolucao(ranking: pd.DataFrame) -> None:
         x=dados["dias_medios_resolucao"],
         y=dados["fornecedor"],
         orientation="h",
-        marker=dict(color=[CORES_FORNECEDOR.get(f, "#64748b") for f in dados["fornecedor"]]),
+        marker=dict(color=[cor_fornecedor(f) for f in dados["fornecedor"]]),
         text=[f"{d:.1f} dias" for d in dados["dias_medios_resolucao"]],
         textposition="outside",
         customdata=dados[["sem_solucao"]],
@@ -175,25 +180,41 @@ def _historico(ocorrencias: pd.DataFrame) -> None:
     )
 
 
-def renderizar(df_cot: pd.DataFrame, df_ocorrencias: pd.DataFrame) -> None:
+def renderizar(df_cot: pd.DataFrame, df_ocorrencias: pd.DataFrame, usuario: bool = False) -> None:
+    """`usuario`: dados de uma planilha enviada (mostra o que falta em vez das instruções do pipeline)."""
     st.markdown(
         '<div class="tab-banner">🛡️ <strong>Cenário de Risco:</strong> Avaliação de cada fornecedor por preço, '
         "prazo, lote mínimo e histórico de problemas dos últimos 12 meses, com alertas de Bom, Médio ou Perigoso.</div>",
         unsafe_allow_html=True,
     )
+    hoje = date.today()
+    sem_cotacoes, sem_ocorrencias = df_cot.empty, df_ocorrencias.empty
 
-    if df_ocorrencias.empty:
+    if not usuario and sem_ocorrencias:
         st.info(
             "ℹ️ O histórico de ocorrências ainda não foi gerado. Rode `python pipeline_completo.py` "
             "(ou `python gerar_ocorrencias_fornecedores.py`) para criar o ranking."
         )
         return
 
-    hoje = date.today()
+    if sem_cotacoes:
+        aviso_dados_faltando("cotacoes", "Para montar o ranking precisamos comparar as propostas de cada fornecedor.")
+        if not sem_ocorrencias:
+            st.subheader("📜 Histórico de Ocorrências")
+            _historico(calcular_penalidades(df_ocorrencias, hoje))
+        return
+
     ranking = ranking_fornecedores(
         df_cot, df_ocorrencias, hoje, chave_produto="sku", coluna_fornecedor="fornecedor_cotacao",
     )
     ocorrencias = calcular_penalidades(df_ocorrencias, hoje)
+
+    if sem_ocorrencias:
+        aviso_dados_faltando(
+            "ocorrencias",
+            "Sem o histórico de problemas, todos os fornecedores ficam com confiabilidade 100 e a nota "
+            "abaixo considera só preço, prazo e lote.",
+        )
 
     st.subheader("🚦 Alertas por Fornecedor")
     st.caption("Avaliação geral de cada fornecedor, considerando todas as cotações (não muda com os filtros da barra lateral).")
@@ -202,6 +223,8 @@ def renderizar(df_cot: pd.DataFrame, df_ocorrencias: pd.DataFrame) -> None:
 
     st.subheader("🏆 Ranking de Fornecedores")
     _tabela_ranking(ranking)
+    if sem_ocorrencias:
+        return
 
     col_tipos, col_resolucao = st.columns(2)
     with col_tipos:

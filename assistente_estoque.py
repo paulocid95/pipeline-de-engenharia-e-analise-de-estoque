@@ -40,6 +40,7 @@ MODELOS_CASCADE = [
     "gemini-flash-latest",
 ]
 MODELO_PADRAO = MODELOS_CASCADE[0]
+PROVEDORES_IA = ["Google Gemini"]
 
 # Proteção da cota da API Gemini em um app público (sem login)
 LIMITE_PERGUNTAS_SESSAO = 10
@@ -151,17 +152,42 @@ def extrair_contexto_executivo_estoque(_engine: Engine) -> str:
     # Datas relativas: a demonstração não envelhece (mesma regra do painel)
     dias = dias_desde(data_referencia(df_est["data_carga"]), date.today())
     df_oc = deslocar_datas(df_oc, ["data_ocorrencia", "data_resolucao"], dias)
+    return montar_contexto(df_est, df_cot, df_oc, date.today())
 
+
+def dados_planilha_para_contexto(estoque: pd.DataFrame, cotacoes, ocorrencias) -> tuple:
+    """Converte os dados higienizados da planilha enviada para o formato usado em montar_contexto."""
+    df_est = estoque.copy()
+    if "estoque_minimo" not in df_est.columns:
+        df_est["estoque_minimo"] = None
+    if cotacoes is None or cotacoes.empty:
+        df_cot = pd.DataFrame(columns=["sku", "nome_produto", "fornecedor", "preco_cotado", "lote_minimo", "prazo_dias"])
+    else:
+        df_cot = cotacoes.rename(columns={"fornecedor_cotacao": "fornecedor"})[
+            ["sku", "nome_produto", "fornecedor", "preco_cotado", "lote_minimo", "prazo_dias"]]
+    if ocorrencias is None:
+        ocorrencias = pd.DataFrame(columns=["fornecedor", "tipo", "gravidade", "data_ocorrencia", "status", "data_resolucao"])
+    return df_est, df_cot, ocorrencias
+
+
+def _inteiro(valor) -> int:
+    return int(valor) if valor is not None and pd.notna(valor) else 0
+
+
+def montar_contexto(
+    df_est: pd.DataFrame, df_cot: pd.DataFrame, df_oc: pd.DataFrame, hoje: date, origem: str = "POSTGRESQL / SCHEMA CORE",
+) -> str:
+    """Síntese executiva do estoque, cotações e ranking de fornecedores para a IA (sem acessar o banco)."""
     # Ranking de risco e melhor opção por produto (mesmas regras do painel)
     ranking = pd.DataFrame()
     opcoes_sku: dict = {}
     if not df_cot.empty:
-        ranking = ranking_fornecedores(df_cot, df_oc, date.today(), chave_produto="sku", coluna_fornecedor="fornecedor")
+        ranking = ranking_fornecedores(df_cot, df_oc, hoje, chave_produto="sku", coluna_fornecedor="fornecedor")
         cot_avaliadas = avaliar_cotacoes(df_cot, ranking, chave_produto="sku", coluna_fornecedor="fornecedor")
         opcoes_sku = opcoes_por_produto(cot_avaliadas, chave_produto="sku")
 
     if df_est.empty:
-        return "Aviso: Nenhum registro de estoque encontrado na base de dados."
+        return "Aviso: Nenhum registro de estoque encontrado."
 
     # Agregações de alto nível
     total_skus = len(df_est)
@@ -182,9 +208,9 @@ def extrair_contexto_executivo_estoque(_engine: Engine) -> str:
         sku = str(row["sku"])
         nome = row["nome_produto"]
         cat = row["nome_categoria"]
-        disp = int(row["quantidade_disponivel"] or 0)
-        minimo = int(row["estoque_minimo"] or 0)
-        preco_ref = float(row["preco_unitario"] or 0)
+        disp = _inteiro(row["quantidade_disponivel"])
+        minimo = _inteiro(row["estoque_minimo"])
+        preco_ref = float(row["preco_unitario"]) if pd.notna(row["preco_unitario"]) else 0.0
 
         linhas = [
             f"  * [{sku}] {nome} | Categoria: {cat}",
@@ -235,7 +261,7 @@ def extrair_contexto_executivo_estoque(_engine: Engine) -> str:
 
     # Montagem do relatório contextual executivo
     linhas_contexto = [
-        "### PANORAMA GERAL DO ESTOQUE (POSTGRESQL / SCHEMA CORE)",
+        f"### PANORAMA GERAL DO ESTOQUE ({origem})",
         f"- Total de SKUs cadastrados: {total_skus}",
         f"- Volume físico disponível: {total_unidades:,} unidades",
         f"- Capital total imobilizado: R$ {capital_total:,.2f}",
@@ -252,7 +278,7 @@ def extrair_contexto_executivo_estoque(_engine: Engine) -> str:
                 f"({r.sem_solucao} sem solução) | Motivo: {r.motivo}"
             )
         if sem_historico:
-            linhas_contexto.append("  (Atenção: histórico de ocorrências ainda não gerado; confiabilidade considerada 100.)")
+            linhas_contexto.append("  (Atenção: sem histórico de ocorrências; confiabilidade considerada 100.)")
     else:
         linhas_contexto.append("  * Ranking indisponível: nenhuma cotação registrada.")
     linhas_contexto += [
@@ -300,7 +326,7 @@ Sua missão é auxiliar gestores de logística, compradores e diretores de suppl
 
 DIRETRIZES FUNDAMENTAIS DE COMPORTAMENTO:
 1. IDIOMA E TOM: Responda estritamente em Português do Brasil (PT-BR), com tom profissional, executivo, analítico e objetivo.
-2. PRECISÃO FÁTICA (ZERO ALUCINAÇÃO): Use exclusivamente os dados reais fornecidos no CONTEXTO OPERACIONAL DO BANCO abaixo. Não invente números, SKUs, preços ou fornecedores inexistentes.
+2. PRECISÃO FÁTICA (ZERO ALUCINAÇÃO): Use exclusivamente os dados reais fornecidos no CONTEXTO OPERACIONAL abaixo. Não invente números, SKUs, preços ou fornecedores inexistentes.
 3. TABELA MARKDOWN OBRIGATÓRIA PARA REPOSIÇÃO E COMPRAS:
    Sempre que o usuário perguntar sobre reposição, produtos críticos, itens em alerta, análise de fornecedores ou decisões de compra, você DEVE estruturar sua resposta PRINCIPALMENTE através de uma TABELA MARKDOWN com as seguintes colunas obrigatórias:
    | Produto Crítico | Fornecedor Recomendado | Classificação | Preço Cotado (R$) | Prazo de Entrega (dias) | Justificativa da Escolha |
@@ -324,7 +350,7 @@ DIRETRIZES FUNDAMENTAIS DE COMPORTAMENTO:
    - Após a tabela Markdown, inclua sempre um resumo executivo com estimativas de investimento e recomendações práticas para a equipe de compras.
 
 ---
-CONTEXTO OPERACIONAL ATUALIZADO DO BANCO DE DADOS:
+CONTEXTO OPERACIONAL ATUALIZADO (DADOS DO ESTOQUE):
 {contexto_banco}
 ---
 """
@@ -457,23 +483,29 @@ def _exibir_contador(espaco) -> None:
     espaco.caption(f"💬 Perguntas restantes nesta sessão: **{restantes} de {LIMITE_PERGUNTAS_SESSAO}**")
 
 
-def renderizar_interface_chat(engine: Engine) -> None:
+def renderizar_interface_chat(engine: Engine, dados_usuario: tuple | None = None) -> None:
     """Renderiza a interface do chatbot dentro do Streamlit, com gerenciamento
 
     enxuto de estado de sessão, feedback visual e streaming de resposta resiliente.
+    `dados_usuario`: (estoque, cotações, ocorrências) de uma planilha enviada; None = demonstração (banco).
     """
+    usuario = dados_usuario is not None
+    # Conversas separadas: a da demonstração não se mistura com a dos dados do usuário
+    chave = "messages_planilha" if usuario else "messages"
+    origem = "aos dados da sua planilha" if usuario else "em tempo real ao PostgreSQL"
     # 1. Inicializa o estado de mensagens da sessão (máximo de 15 turnos para poupar RAM)
-    if "messages" not in st.session_state:
-        st.session_state.messages = [
+    if chave not in st.session_state:
+        st.session_state[chave] = [
             {
                 "role": "assistant",
                 "content": (
-                    "Olá! Sou seu **Assistente de Inteligência de Estoque e Compras** conectado em tempo real "
-                    "ao PostgreSQL.\n\nComo posso ajudar? Você pode me perguntar sobre **produtos críticos**, "
+                    f"Olá! Sou seu **Assistente de Inteligência de Estoque e Compras** conectado {origem}."
+                    "\n\nComo posso ajudar? Você pode me perguntar sobre **produtos críticos**, "
                     "**fornecedores com menor preço**, **prazos de entrega mais ágeis** ou simulações de compra."
                 ),
             }
         ]
+    mensagens = st.session_state[chave]
 
     # Contador de uso da sessão (não é zerado pelo botão "Limpar Chat")
     st.session_state.setdefault("perguntas_feitas", 0)
@@ -486,6 +518,9 @@ def renderizar_interface_chat(engine: Engine) -> None:
         "recomendações de negociação e triagem de rupturas com processamento em nuvem via Google Gemini.</div>",
         unsafe_allow_html=True,
     )
+    if usuario:
+        from dashboard.componentes import aviso_ia_privacidade
+        aviso_ia_privacidade(PROVEDORES_IA)
 
     # 2. Barra de utilitários superior (Status de API e Ações Rápidas)
     api_key = obter_chave_gemini()
@@ -493,7 +528,8 @@ def renderizar_interface_chat(engine: Engine) -> None:
 
     with col_status:
         if api_key:
-            st.caption(f"🟢 **IA Conectada:** Google Gemini ({MODELO_PADRAO} | Failover Ativo | PostgreSQL Neon)")
+            fonte = "Sua planilha" if usuario else "PostgreSQL Neon"
+            st.caption(f"🟢 **IA Conectada:** Google Gemini ({MODELO_PADRAO} | Failover Ativo | {fonte})")
             contador = st.empty()
             _exibir_contador(contador)
         else:
@@ -505,7 +541,7 @@ def renderizar_interface_chat(engine: Engine) -> None:
 
     with col_btn:
         if st.button("🗑️ Limpar Chat", width="stretch", help="Reinicia o histórico da conversa"):
-            st.session_state.messages = [
+            st.session_state[chave] = [
                 {
                     "role": "assistant",
                     "content": "Histórico reiniciado. Como posso te auxiliar com o estoque hoje?",
@@ -529,7 +565,7 @@ def renderizar_interface_chat(engine: Engine) -> None:
             pergunta_clicada = "Qual fornecedor oferece o menor preço unitário por produto e qual a economia estimada?"
 
     # 4. Renderiza histórico de mensagens
-    for msg in st.session_state.messages:
+    for msg in mensagens:
         avatar = "🤖" if msg["role"] == "assistant" else "👤"
         with st.chat_message(msg["role"], avatar=avatar):
             st.markdown(msg["content"])
@@ -558,7 +594,7 @@ def renderizar_interface_chat(engine: Engine) -> None:
         st.session_state.ultimo_envio = agora
 
         # Registra mensagem do usuário
-        st.session_state.messages.append({"role": "user", "content": user_prompt})
+        mensagens.append({"role": "user", "content": user_prompt})
         with st.chat_message("user", avatar="👤"):
             st.markdown(user_prompt)
 
@@ -570,15 +606,21 @@ def renderizar_interface_chat(engine: Engine) -> None:
                     "Por favor, configure o segredo no painel do Streamlit Cloud ou crie o arquivo `.streamlit/secrets.toml`."
                 )
                 st.error(resposta_vazia)
-                st.session_state.messages.append({"role": "assistant", "content": resposta_vazia})
+                mensagens.append({"role": "assistant", "content": resposta_vazia})
             else:
                 st.session_state.perguntas_feitas += 1
                 if api_key:
                     _exibir_contador(contador)
                 # Feedback visual suave enquanto consulta o banco e conecta à IA com retry e failover
                 with st.spinner("A consultar fornecedores e a calcular análise com a IA..."):
-                    contexto_banco = extrair_contexto_executivo_estoque(engine)
-                    historico_recente = st.session_state.messages[-10:]
+                    if usuario:
+                        contexto_banco = montar_contexto(
+                            *dados_planilha_para_contexto(*dados_usuario), date.today(),
+                            origem="PLANILHA ENVIADA PELO USUÁRIO",
+                        )
+                    else:
+                        contexto_banco = extrair_contexto_executivo_estoque(engine)
+                    historico_recente = mensagens[-10:]
 
                     stream_gerador = gerar_resposta_assistente_stream(
                         mensagens=historico_recente,
@@ -591,4 +633,4 @@ def renderizar_interface_chat(engine: Engine) -> None:
                 resposta_completa = st.write_stream(stream_gerador)
 
                 # Salva a resposta no histórico da sessão
-                st.session_state.messages.append({"role": "assistant", "content": str(resposta_completa)})
+                mensagens.append({"role": "assistant", "content": str(resposta_completa)})

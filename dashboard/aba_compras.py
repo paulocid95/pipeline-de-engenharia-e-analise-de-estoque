@@ -5,7 +5,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from dashboard.formatacao import formatar_moeda_brl
-from dashboard.graficos import CORES_FORNECEDOR, exibir_grafico
+from dashboard.graficos import cor_fornecedor, exibir_grafico
 from regras_fornecedores import ICONE_CLASSE, motivo_derrota, opcoes_por_produto
 
 
@@ -127,13 +127,17 @@ def _simulador_recompra(df_cot_filtrado: pd.DataFrame, df_cot_avaliado: pd.DataF
                 st.markdown(_detalhe_produto(op))
 
 
-def renderizar(df_cot_filtrado: pd.DataFrame, df_cot_avaliado: pd.DataFrame) -> None:
+def renderizar_cabecalho() -> None:
     st.markdown(
         '<div class="tab-banner">💡 <strong>Cenário de Procurement:</strong> Auditoria de propostas concorrentes, identificação de saving potencial e otimização da relação custo vs. prazo de entrega.</div>',
         unsafe_allow_html=True,
     )
     st.subheader("💡 Inteligência de Compras e Cotações (Procurement Analytics)")
     st.caption("Central estratégica de negociação: simulação de cenários de recompra, concorrência direta e captura de saving unitário.")
+
+
+def renderizar(df_cot_filtrado: pd.DataFrame, df_cot_avaliado: pd.DataFrame) -> None:
+    renderizar_cabecalho()
 
     if not df_cot_filtrado.empty:
         # 1. Cards / Métricas no Topo
@@ -269,8 +273,6 @@ def renderizar(df_cot_filtrado: pd.DataFrame, df_cot_avaliado: pd.DataFrame) -> 
             # Dois Gráficos de Barras Horizontais Límpidos (Zero Sobreposição)
             col_g1, col_g2 = st.columns(2)
 
-            paleta_fornecedores = CORES_FORNECEDOR
-
             with col_g1:
                 # Gráfico 1: Prazo Médio (quanto menor, mais ágil)
                 df_prazo = resumo_fornecedores.sort_values(by="prazo_medio", ascending=False)
@@ -280,7 +282,7 @@ def renderizar(df_cot_filtrado: pd.DataFrame, df_cot_avaliado: pd.DataFrame) -> 
                         y=df_prazo["fornecedor_cotacao"],
                         orientation="h",
                         marker=dict(
-                            color=[paleta_fornecedores.get(f, "#64748b") for f in df_prazo["fornecedor_cotacao"]],
+                            color=[cor_fornecedor(f) for f in df_prazo["fornecedor_cotacao"]],
                             line=dict(width=0),
                         ),
                         text=[f"<b>{p:.1f} dias úteis</b>" for p in df_prazo["prazo_medio"]],
@@ -317,7 +319,7 @@ def renderizar(df_cot_filtrado: pd.DataFrame, df_cot_avaliado: pd.DataFrame) -> 
                         y=df_saving["fornecedor_cotacao"],
                         orientation="h",
                         marker=dict(
-                            color=[paleta_fornecedores.get(f, "#64748b") for f in df_saving["fornecedor_cotacao"]],
+                            color=[cor_fornecedor(f) for f in df_saving["fornecedor_cotacao"]],
                             line=dict(width=0),
                         ),
                         text=[f"<b>+{s:.1f}% saving</b>" for s in df_saving["saving_medio"]],

@@ -3,6 +3,8 @@
 Tudo fica só na sessão (st.session_state): nada é gravado no banco.
 """
 
+from datetime import datetime
+
 import pandas as pd
 import streamlit as st
 
@@ -13,6 +15,7 @@ from higienizacao import (
     ler_arquivo, preparar, remapear,
 )
 from higienizacao.colunas import ESQUEMAS, OBRIGATORIAS, faltando
+from higienizacao.exportacao import NOME_ARQUIVO_LIMPO, planilha_higienizada
 from planilha_exemplo import NOME_ARQUIVO
 from regras_estoque import LIMITE_ALERTA, LIMITE_EXCESSO
 
@@ -30,6 +33,9 @@ LIBERA = {
 # Chaves do st.session_state
 K_ASSINATURA, K_ENTRADAS, K_ERROS = "envio_assinatura", "envio_entradas", "envio_erros"
 K_RESULTADO, K_DECISOES, K_UPLOADER = "envio_resultado", "envio_decisoes", "envio_uploader"
+# Dados que alimentam o painel: guardados à parte para sobreviver à troca de tela
+K_MEUS_DADOS = "meus_dados"
+MIME_XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 
 # ------------------------------------------------------------------------------
@@ -54,6 +60,22 @@ def _recomecar() -> None:
 
 def _voltar_ao_inicio() -> None:
     st.query_params.pop("tela", None)
+
+
+def enviar_outra_planilha() -> None:
+    """Descarta os dados atuais e abre a tela de envio vazia."""
+    _recomecar()
+    st.session_state.pop(K_MEUS_DADOS, None)
+    st.session_state.pop("messages_planilha", None)
+    st.query_params["tela"] = "envio"
+
+
+def _abrir_analise(alerta: int) -> None:
+    st.session_state[K_MEUS_DADOS] = {
+        "resultado": st.session_state[K_RESULTADO], "alerta": alerta, "enviado_em": datetime.now(),
+    }
+    st.session_state.pop("messages_planilha", None)     # dados novos, conversa nova
+    st.query_params["tela"] = "meus_dados"
 
 
 def _ler_envio(arquivos) -> None:
@@ -98,7 +120,7 @@ def _guia() -> None:
         from dashboard.pagina_inicial import _planilha_exemplo
         st.download_button(
             "📥 Baixar planilha de exemplo para usar como base", data=_planilha_exemplo, file_name=NOME_ARQUIVO,
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", on_click="ignore",
+            mime=MIME_XLSX, on_click="ignore",
         )
 
 
@@ -335,9 +357,13 @@ def _revisao(alerta: int, excesso: int) -> None:
     _duvidas(resultado, alerta, excesso)
     _relatorio(resultado)
     st.divider()
-    st.button("📊 Ver a análise dos meus dados", type="primary", width="stretch", disabled=True,
-              help="O painel com os seus dados chega na próxima atualização.")
-    st.caption("🚧 O painel com os seus dados está em construção e chega na próxima atualização.")
+    st.button("📊 Ver a análise dos meus dados", type="primary", width="stretch",
+              on_click=_abrir_analise, args=(alerta,))
+    st.download_button(
+        "📥 Baixar meus dados higienizados (Excel)", data=lambda: planilha_higienizada(resultado),
+        file_name=NOME_ARQUIVO_LIMPO, mime=MIME_XLSX, on_click="ignore", width="stretch",
+        help="Uma aba por tabela, já padronizada. Você pode enviar este arquivo de novo depois.",
+    )
 
 
 # ------------------------------------------------------------------------------
@@ -367,3 +393,29 @@ def renderizar() -> None:
     if st.button(rotulo, type="primary", disabled=not pode, width="stretch"):
         _executar(alerta, excesso)
     _revisao(alerta, excesso)
+
+
+# ------------------------------------------------------------------------------
+# Painel com os dados enviados
+# ------------------------------------------------------------------------------
+def renderizar_meus_dados() -> None:
+    from dashboard.painel import Fonte, renderizar as renderizar_painel
+
+    dados = st.session_state.get(K_MEUS_DADOS)
+    if dados is None:
+        # Página recarregada ou link aberto em outra aba: os dados ficam só na sessão em que foram enviados
+        aplicar_estilo()
+        st.button("← Voltar ao início", type="tertiary", on_click=_voltar_ao_inicio)
+        cabecalho(
+            titulo="Seus dados não estão mais aqui",
+            texto="Por segurança, a planilha fica só na sessão em que foi enviada e some quando a página é "
+                  "recarregada ou fechada. Envie de novo para ver a análise.",
+            conectado=None, chips=["🔒 Nada é guardado"],
+        )
+        st.button("📤 Enviar minha planilha", type="primary", on_click=enviar_outra_planilha, key="meus_dados_enviar")
+        return
+    resultado = dados["resultado"]
+    renderizar_painel(Fonte.da_planilha(
+        resultado, limite_alerta=dados["alerta"], enviado_em=dados["enviado_em"],
+        planilha_limpa=lambda: planilha_higienizada(resultado),
+    ))

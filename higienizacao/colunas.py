@@ -152,11 +152,17 @@ class Deteccao:
     confianca: float = 0.0
 
 
+# Abas de apoio que nunca são dados (ex.: o relatório da planilha limpa que o próprio app gera)
+_NOMES_IGNORADOS = ["relatorio da limpeza", "leia me", "readme"]
+
+
 def detectar_tipo(bruta: pd.DataFrame, nome: str = "") -> Deteccao:
     """Descobre se a tabela é Estoque, Cotações, Ocorrências ou Vendas (pelo nome e pelas colunas)."""
     linha, _ = encontrar_cabecalho(bruta)
     cabecalhos = list(bruta.iloc[linha]) if len(bruta) else []
     nome_norm = normalizar(nome)
+    if any(n in nome_norm for n in _NOMES_IGNORADOS):
+        return Deteccao(None, linha, cabecalhos)
     melhor = Deteccao(None, linha, cabecalhos)
     melhor_pontos = 0.0
     for tipo in TIPOS:

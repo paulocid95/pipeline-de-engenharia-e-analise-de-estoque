@@ -226,6 +226,9 @@ def ranking_fornecedores(
             + PESOS["confiabilidade"] * confiabilidade
         )
         classe, motivo = classificar(nota, oc_forn)
+        if oc.empty:
+            # Sem nenhum histórico enviado não dá para afirmar que o fornecedor é confiável
+            motivo = "Sem histórico de ocorrências: nota só por preço, prazo e lote"
 
         no_periodo = oc_forn[oc_forn["penalidade"] > 0] if not oc_forn.empty else oc_forn
         resolvidas = no_periodo[no_periodo["status"] == "RESOLVIDO"] if not no_periodo.empty else no_periodo
