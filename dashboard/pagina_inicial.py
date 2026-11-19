@@ -6,10 +6,13 @@ Os botões são nativos do Streamlit, porque disparam ações do app
 """
 
 import base64
+from datetime import date
 from functools import cache
 from pathlib import Path
 
 import streamlit as st
+
+from planilha_exemplo import NOME_ARQUIVO, montar_planilha_exemplo
 
 PASTA = Path(__file__).parent / "inicio"
 URL_GITHUB = "https://github.com/paulocid95/pipeline-de-engenharia-e-analise-de-estoque"
@@ -35,6 +38,20 @@ def _script(codigo: str) -> str:
 
 def _html(conteudo: str) -> None:
     st.html(conteudo, unsafe_allow_javascript=True)
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def _gerar_planilha(hoje: date) -> bytes:
+    from dashboard.dados import carregar_dados_analiticos, carregar_dados_cotacoes, carregar_ocorrencias
+
+    return montar_planilha_exemplo(
+        carregar_dados_analiticos(), carregar_dados_cotacoes(), carregar_ocorrencias(), hoje,
+    )
+
+
+def _planilha_exemplo() -> bytes:
+    """Gerada só quando o visitante clica em baixar (a página inicial não consulta o banco)."""
+    return _gerar_planilha(date.today())
 
 
 def _abrir_demonstracao() -> None:
@@ -213,8 +230,14 @@ def renderizar() -> None:
         with st.container(key="si_acoes", horizontal=True, gap="small"):
             with st.container(key="si_demo", width="content"):
                 st.button("🚀 Ver demonstração ao vivo", type="primary", on_click=_abrir_demonstracao)
-            if st.button("📥 Baixar planilha de exemplo"):
-                st.toast("📥 A planilha de exemplo chega na próxima atualização.")
+            st.download_button(
+                "📥 Baixar planilha de exemplo",
+                data=_planilha_exemplo,
+                file_name=NOME_ARQUIVO,
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                on_click="ignore",
+                help="Excel com estoque, cotações, ocorrências e vendas da demonstração, bagunçados de propósito",
+            )
             if st.button("📤 Analisar minha planilha", help="Veja o que sua planilha precisa ter"):
                 _dialogo_upload()
         _html(HEROI_SELOS)
