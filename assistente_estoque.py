@@ -1,15 +1,19 @@
 """
 Módulo de Assistente Virtual de Estoque e Compras (Chatbot com Google Gemini).
 Fornece extração de contexto de banco de dados (PostgreSQL/Neon), engenharia de prompts,
-arquitetura de resiliência com failover cascata de modelos (gemini-3.8-flash -> gemini-3.5-flash -> gemini-flash-lite-latest)
+arquitetura de resiliência com failover cascata de modelos Gemini e reserva gratuita no Groq,
 e entrega fluida via st.write_stream sem cortes ou truncamentos.
 """
 
 import logging
 import os
+import re
 import time
+from dataclasses import dataclass
 from datetime import date
 from typing import Generator
+
+import httpx
 import pandas as pd
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
@@ -40,7 +44,15 @@ MODELOS_CASCADE = [
     "gemini-flash-latest",
 ]
 MODELO_PADRAO = MODELOS_CASCADE[0]
-PROVEDORES_IA = ["Google Gemini"]
+
+# Reserva gratuita: Groq (API compatível com a da OpenAI). Só é usado se todos os modelos do Gemini falharem.
+# O catálogo gratuito do Groq muda sem aviso: se um modelo sair, o próximo da lista é tentado.
+GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
+MODELOS_GROQ = ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3-32b"]
+# O plano gratuito do Groq aceita poucos tokens por minuto: contexto enxuto, histórico curto e resposta menor
+MENSAGENS_GROQ = 4
+MAX_TOKENS_GROQ = 2000
+ITENS_CONTEXTO_ENXUTO = 10
 
 # Proteção da cota da API Gemini em um app público (sem login)
 LIMITE_PERGUNTAS_SESSAO = 10
@@ -88,11 +100,26 @@ def obter_chave_gemini() -> str:
     return ""
 
 
+def obter_chave_groq() -> str:
+    """Chave da reserva Groq (opcional): st.secrets ou os.environ."""
+    try:
+        if "GROQ_API_KEY" in st.secrets:
+            return str(st.secrets["GROQ_API_KEY"]).strip()
+    except Exception:
+        pass
+    return (os.getenv("GROQ_API_KEY") or "").strip()
+
+
+def provedores_ativos(chave_gemini: str, chave_groq: str) -> list[str]:
+    """Quem pode receber as perguntas (citado no aviso de privacidade)."""
+    return [nome for nome, chave in (("Google Gemini", chave_gemini), ("Groq", chave_groq)) if chave] or ["Google Gemini"]
+
+
 # ==============================================================================
 # 2. EXTRAÇÃO DE CONTEXTO ANALÍTICO DO BANCO (GROUND TRUTH / IN-MEMORY CACHE)
 # ==============================================================================
 @st.cache_data(ttl=60, show_spinner=False)
-def extrair_contexto_executivo_estoque(_engine: Engine) -> str:
+def extrair_contexto_executivo_estoque(_engine: Engine, enxuto: bool = False) -> str:
     """Extrai uma síntese executiva e altamente estruturada da situação atual do estoque
 
     e cotações de fornecedores. Cruza diretamente produtos críticos e em alerta
@@ -152,7 +179,7 @@ def extrair_contexto_executivo_estoque(_engine: Engine) -> str:
     # Datas relativas: a demonstração não envelhece (mesma regra do painel)
     dias = dias_desde(data_referencia(df_est["data_carga"]), date.today())
     df_oc = deslocar_datas(df_oc, ["data_ocorrencia", "data_resolucao"], dias)
-    return montar_contexto(df_est, df_cot, df_oc, date.today())
+    return montar_contexto(df_est, df_cot, df_oc, date.today(), enxuto=enxuto)
 
 
 def dados_planilha_para_contexto(estoque: pd.DataFrame, cotacoes, ocorrencias) -> tuple:
@@ -176,8 +203,13 @@ def _inteiro(valor) -> int:
 
 def montar_contexto(
     df_est: pd.DataFrame, df_cot: pd.DataFrame, df_oc: pd.DataFrame, hoje: date, origem: str = "POSTGRESQL / SCHEMA CORE",
+    enxuto: bool = False,
 ) -> str:
-    """Síntese executiva do estoque, cotações e ranking de fornecedores para a IA (sem acessar o banco)."""
+    """Síntese executiva do estoque, cotações e ranking de fornecedores para a IA (sem acessar o banco).
+
+    `enxuto`: versão curta para a reserva Groq (limite baixo de tokens): só panorama, ranking e os
+    primeiros itens críticos e em alerta, sem a lista completa de fornecedores e sem os demais produtos.
+    """
     # Ranking de risco e melhor opção por produto (mesmas regras do painel)
     ranking = pd.DataFrame()
     opcoes_sku: dict = {}
@@ -226,7 +258,8 @@ def montar_contexto(
                 f"({c['prazo_dias']} dias, lote {c['lote_minimo']} un)"
                 for c in cots
             ]
-            linhas.append(f"    - Todos Fornecedores Disponíveis: {'; '.join(opcoes_forn)}")
+            if not enxuto:
+                linhas.append(f"    - Todos Fornecedores Disponíveis: {'; '.join(opcoes_forn)}")
         else:
             linhas.append("    - Fornecedores: Nenhuma cotação concorrente cadastrada para este produto.")
 
@@ -286,20 +319,30 @@ def montar_contexto(
         "### ITENS EM SITUAÇÃO CRÍTICA (RUPTURA IMINENTE OU ESTOQUE ZERADO) COM SEUS FORNECEDORES:",
     ]
 
-    if not criticos.empty:
-        for _, row in criticos.iterrows():
+    def _detalhar(itens: pd.DataFrame) -> None:
+        mostrar = itens.head(ITENS_CONTEXTO_ENXUTO) if enxuto else itens
+        for _, row in mostrar.iterrows():
             linhas_contexto.extend(formatar_item_detalhado_com_fornecedores(row))
+        if len(mostrar) < len(itens):
+            linhas_contexto.append(
+                f"  * (Resumo: mais {len(itens) - len(mostrar)} itens nesta situação não detalhados; "
+                "avise o usuário que a lista está resumida.)"
+            )
+
+    if not criticos.empty:
+        _detalhar(criticos)
     else:
         linhas_contexto.append("  * Nenhum SKU em estado crítico no momento.")
 
     linhas_contexto.append("")
     linhas_contexto.append("### ITENS EM NÍVEL DE ALERTA (BAIXA COBERTURA) COM SEUS FORNECEDORES:")
     if not alertas.empty:
-        for _, row in alertas.iterrows():
-            linhas_contexto.extend(formatar_item_detalhado_com_fornecedores(row))
+        _detalhar(alertas)
     else:
         linhas_contexto.append("  * Nenhum SKU em estado de alerta.")
 
+    if enxuto:
+        return "\n".join(linhas_contexto)
     linhas_contexto.append("")
     linhas_contexto.append("### DEMAIS PRODUTOS (SITUAÇÃO NORMAL OU EXCESSO) COM SUAS OPÇÕES DE FORNECEDOR:")
     # Produtos críticos e em alerta já foram detalhados acima: aqui entram só os demais
@@ -356,6 +399,134 @@ CONTEXTO OPERACIONAL ATUALIZADO (DADOS DO ESTOQUE):
 """
 
 
+@dataclass
+class Resposta:
+    texto: str
+    origem: str | None = None       # "Google Gemini (modelo)" ou "Groq (modelo)"; None = falha
+
+
+MSG_SEM_CHAVE = (
+    "⚠️ Nenhuma chave de IA configurada. Configure `GEMINI_API_KEY` (e, opcionalmente, `GROQ_API_KEY`) "
+    "nos Secrets do Streamlit ou no `.env`."
+)
+MSG_INDISPONIVEL = (
+    "⚠️ **Os servidores de IA estão temporariamente indisponíveis no momento.**\n\n"
+    "👉 Por favor, aguarde alguns instantes e reenvie sua pergunta."
+)
+
+
+def _tentar_gemini(mensagens, system_instruction, api_key, modelo, max_retries, backoff_base) -> tuple:
+    """Cascata de modelos Gemini. Devolve (texto, modelo) ou (None, último erro)."""
+    modelos_a_tentar = [modelo] + [m for m in MODELOS_CASCADE if m != modelo]
+    ultimo_erro = None
+    try:
+        from google import genai
+        from google.genai import types
+
+        # Tempo limite por chamada: um modelo travado passa a vez ao próximo em vez de prender o usuário
+        client = genai.Client(api_key=api_key, http_options=types.HttpOptions(timeout=TIMEOUT_CHAMADA_MS))
+        contents = [
+            types.Content(role="user" if m["role"] == "user" else "model", parts=[types.Part.from_text(text=m["content"])])
+            for m in mensagens
+        ]
+        config = types.GenerateContentConfig(
+            system_instruction=system_instruction, temperature=0.2, max_output_tokens=3500,
+        )
+        for mod in modelos_a_tentar:
+            for tentativa in range(1, max_retries + 1):
+                try:
+                    response = client.models.generate_content(model=mod, contents=contents, config=config)
+                    if response.text and len(response.text.strip()) > 50:
+                        return response.text, mod
+                except Exception as e:
+                    ultimo_erro = e
+                    # Cota diária estourada (429): pula direto para o próximo modelo da cascata
+                    msg_err = str(e).lower()
+                    if "429" in msg_err or "resource_exhausted" in msg_err:
+                        break
+                    time.sleep(backoff_base * tentativa)   # 503 temporário: espera um pouco
+    except Exception as e:
+        ultimo_erro = e
+    return None, ultimo_erro
+
+
+_PENSAMENTO = re.compile(r"<think>.*?</think>", re.DOTALL | re.IGNORECASE)
+
+
+def _tentar_groq(mensagens, system_instruction, api_key, cliente: httpx.Client | None = None) -> tuple:
+    """Reserva Groq: tenta os modelos gratuitos em ordem. Devolve (texto, modelo) ou (None, último erro)."""
+    corpo_mensagens = [{"role": "system", "content": system_instruction}] + [
+        {"role": "user" if m["role"] == "user" else "assistant", "content": m["content"]}
+        for m in mensagens[-MENSAGENS_GROQ:]
+    ]
+    ultimo_erro = None
+    proprio = cliente is None
+    cliente = cliente or httpx.Client(timeout=TIMEOUT_CHAMADA_MS / 1000)
+    try:
+        for modelo in MODELOS_GROQ:
+            try:
+                r = cliente.post(
+                    GROQ_URL,
+                    headers={"Authorization": f"Bearer {api_key}"},
+                    json={"model": modelo, "messages": corpo_mensagens, "temperature": 0.2,
+                          "max_tokens": MAX_TOKENS_GROQ},
+                )
+                if r.status_code != 200:
+                    # 404/400: modelo saiu do catálogo; 413/429: limite do plano gratuito -> próximo modelo
+                    ultimo_erro = f"Groq {modelo}: HTTP {r.status_code}"
+                    continue
+                texto = r.json()["choices"][0]["message"].get("content") or ""
+                texto = _PENSAMENTO.sub("", texto).strip()      # alguns modelos devolvem o raciocínio
+                if len(texto) > 50:
+                    return texto, modelo
+                ultimo_erro = f"Groq {modelo}: resposta vazia"
+            except Exception as e:
+                ultimo_erro = e
+    finally:
+        if proprio:
+            cliente.close()
+    return None, ultimo_erro
+
+
+def obter_resposta(
+    mensagens: list[dict],
+    contexto_banco: str,
+    api_key: str,
+    chave_groq: str = "",
+    contexto_enxuto: str | None = None,
+    modelo: str = MODELO_PADRAO,
+    max_retries: int = 1,
+    backoff_base: float = 1.5,
+    cliente_groq: httpx.Client | None = None,
+) -> Resposta:
+    """Pergunta ao Gemini (cascata de modelos) e, se todos falharem, à reserva Groq com o contexto enxuto."""
+    if not api_key and not chave_groq:
+        return Resposta(MSG_SEM_CHAVE)
+    erros = []
+    if api_key:
+        texto, info = _tentar_gemini(mensagens, construir_prompt_sistema(contexto_banco), api_key, modelo,
+                                     max_retries, backoff_base)
+        if texto:
+            return Resposta(texto, f"Google Gemini ({info})")
+        erros.append(info)
+    if chave_groq:
+        prompt = construir_prompt_sistema(contexto_enxuto or contexto_banco)
+        texto, info = _tentar_groq(mensagens, prompt, chave_groq, cliente_groq)
+        if texto:
+            return Resposta(texto, f"Groq ({info.split('/')[-1]})")
+        erros.append(info)
+    logger.error("Falha em todos os provedores de IA: %r", erros)
+    return Resposta(MSG_INDISPONIVEL)
+
+
+def digitar(texto: str) -> Generator[str, None, None]:
+    """Entrega a resposta palavra a palavra para st.write_stream (sensação de digitação, sem cortes)."""
+    palavras = texto.split(" ")
+    for i, palavra in enumerate(palavras):
+        yield palavra + (" " if i < len(palavras) - 1 else "")
+        time.sleep(0.012)
+
+
 def gerar_resposta_assistente_stream(
     mensagens: list[dict],
     contexto_banco: str,
@@ -364,119 +535,19 @@ def gerar_resposta_assistente_stream(
     max_retries: int = 1,
     backoff_base: float = 1.5,
 ) -> Generator[str, None, None]:
-    """Chama a API do Google Gemini com resiliência máxima e entrega fluida.
-
-    Utiliza estratégia de Failover em Cascata: se o modelo primário estiver sobrecarregado
-    (503) ou com cota diária excedida (429), transita automaticamente para os modelos estáveis.
-    Gera o texto de forma completa e atômica, eliminando 100% de quebras no meio da frase.
-    """
-    if not api_key:
-        yield "⚠️ Chave de API do Google Gemini não configurada. Configure `GEMINI_API_KEY` nos Secrets do Streamlit ou no `.env`."
-        return
-
-    system_instruction = construir_prompt_sistema(contexto_banco)
-
-    # 1. Configuração dos modelos em cascata (começando pelo solicitado ou configurado)
-    modelos_a_tentar = [modelo] + [m for m in MODELOS_CASCADE if m != modelo]
-
-    texto_final = None
-    ultimo_erro = None
-
-    try:
-        from google import genai
-        from google.genai import types
-
-        # Tempo limite por chamada: um modelo travado passa a vez ao próximo em vez de prender o usuário
-        client = genai.Client(api_key=api_key, http_options=types.HttpOptions(timeout=TIMEOUT_CHAMADA_MS))
-
-        contents = []
-        for msg in mensagens:
-            role = "user" if msg["role"] == "user" else "model"
-            contents.append(types.Content(role=role, parts=[types.Part.from_text(text=msg["content"])]))
-
-        config = types.GenerateContentConfig(
-            system_instruction=system_instruction,
-            temperature=0.2,
-            max_output_tokens=3500,
-        )
-
-        # Cascata de failover resiliente
-        for mod in modelos_a_tentar:
-            for tentativa in range(1, max_retries + 1):
-                try:
-                    response = client.models.generate_content(
-                        model=mod,
-                        contents=contents,
-                        config=config,
-                    )
-                    if response.text and len(response.text.strip()) > 50:
-                        texto_final = response.text
-                        break
-                except Exception as e:
-                    ultimo_erro = e
-                    # Se for cota diária estourada (429), pula imediatamente para o próximo modelo da cascata
-                    msg_err = str(e).lower()
-                    if "429" in msg_err or "resource_exhausted" in msg_err:
-                        break
-                    # Se for 503 temporário, aguarda com backoff breve
-                    time.sleep(backoff_base * tentativa)
-
-            if texto_final:
-                break
-
-    except ImportError:
-        # Fallback legado para ambientes que tenham apenas google-generativeai
-        try:
-            import google.generativeai as legacy_genai
-
-            legacy_genai.configure(api_key=api_key)
-
-            for mod in modelos_a_tentar:
-                try:
-                    model_instance = legacy_genai.GenerativeModel(
-                        model_name=mod,
-                        system_instruction=system_instruction,
-                        generation_config={"temperature": 0.2, "max_output_tokens": 3500},
-                    )
-                    history = [
-                        {"role": "user" if m["role"] == "user" else "model", "parts": [m["content"]]}
-                        for m in mensagens[:-1]
-                    ]
-                    chat = model_instance.start_chat(history=history)
-                    ultima_msg = mensagens[-1]["content"] if mensagens else ""
-                    resp = chat.send_message(ultima_msg)
-                    if resp.text:
-                        texto_final = resp.text
-                        break
-                except Exception as e:
-                    ultimo_erro = e
-        except Exception as e:
-            ultimo_erro = e
-
-    # Se nenhum modelo conseguiu responder
-    if not texto_final:
-        if ultimo_erro is not None:
-            logger.error("Falha em todos os modelos Gemini: %r", ultimo_erro)
-        yield (
-            "⚠️ **Os servidores de IA estão temporariamente indisponíveis no momento.**\n\n"
-            "👉 Por favor, aguarde alguns instantes e reenvie sua pergunta."
-        )
-        return
-
-    # 2. Transmissão suave palavra a palavra para st.write_stream (sensação de streaming em tempo real)
-    # Garante que 100% da resposta completa seja entregue, sem nenhum corte no meio
-    palavras = texto_final.split(" ")
-    total_palavras = len(palavras)
-    for i, palavra in enumerate(palavras):
-        espaco = " " if i < total_palavras - 1 else ""
-        yield palavra + espaco
-        # Micro-delay ajustado para digitação rápida e responsiva
-        time.sleep(0.012)
+    """Compatibilidade: resposta só do Gemini, já em formato de stream."""
+    yield from digitar(obter_resposta(mensagens, contexto_banco, api_key, modelo=modelo,
+                                      max_retries=max_retries, backoff_base=backoff_base).texto)
 
 
 # ==============================================================================
 # 4. COMPONENTE DE INTERFACE STREAMLIT (LEVE & REATIVO)
 # ==============================================================================
+def _rotulo_origem(origem: str) -> str:
+    icone = "⚡" if origem.startswith("Groq") else "✨"
+    return f"{icone} Respondido por {origem}"
+
+
 def _exibir_contador(espaco) -> None:
     """Mostra quantas perguntas ainda restam na sessão."""
     restantes = max(LIMITE_PERGUNTAS_SESSAO - st.session_state.perguntas_feitas, 0)
@@ -520,16 +591,19 @@ def renderizar_interface_chat(engine: Engine, dados_usuario: tuple | None = None
     )
     if usuario:
         from dashboard.componentes import aviso_ia_privacidade
-        aviso_ia_privacidade(PROVEDORES_IA)
+        aviso_ia_privacidade(provedores_ativos(obter_chave_gemini(), obter_chave_groq()))
 
     # 2. Barra de utilitários superior (Status de API e Ações Rápidas)
     api_key = obter_chave_gemini()
+    chave_groq = obter_chave_groq()
     col_status, col_btn = st.columns([3, 1])
 
     with col_status:
-        if api_key:
+        if api_key or chave_groq:
             fonte = "Sua planilha" if usuario else "PostgreSQL Neon"
-            st.caption(f"🟢 **IA Conectada:** Google Gemini ({MODELO_PADRAO} | Failover Ativo | {fonte})")
+            reserva = " + reserva Groq" if chave_groq and api_key else ""
+            principal = "Google Gemini" if api_key else "Groq"
+            st.caption(f"🟢 **IA Conectada:** {principal}{reserva} (Failover Ativo | {fonte})")
             contador = st.empty()
             _exibir_contador(contador)
         else:
@@ -569,6 +643,8 @@ def renderizar_interface_chat(engine: Engine, dados_usuario: tuple | None = None
         avatar = "🤖" if msg["role"] == "assistant" else "👤"
         with st.chat_message(msg["role"], avatar=avatar):
             st.markdown(msg["content"])
+            if msg.get("origem"):
+                st.caption(_rotulo_origem(msg["origem"]))
 
     # 5. Captura entrada do usuário (seja via digitação ou botão de prompt rápido)
     if limite_atingido:
@@ -600,37 +676,28 @@ def renderizar_interface_chat(engine: Engine, dados_usuario: tuple | None = None
 
         # 6. Extrai contexto do banco e gera resposta com streaming resiliente e feedback visual
         with st.chat_message("assistant", avatar="🤖"):
-            if not api_key:
-                resposta_vazia = (
-                    "Não foi possível processar a resposta porque a chave `GEMINI_API_KEY` não está configurada.\n"
-                    "Por favor, configure o segredo no painel do Streamlit Cloud ou crie o arquivo `.streamlit/secrets.toml`."
-                )
-                st.error(resposta_vazia)
-                mensagens.append({"role": "assistant", "content": resposta_vazia})
+            if not api_key and not chave_groq:
+                st.error(MSG_SEM_CHAVE)
+                mensagens.append({"role": "assistant", "content": MSG_SEM_CHAVE})
             else:
                 st.session_state.perguntas_feitas += 1
-                if api_key:
-                    _exibir_contador(contador)
-                # Feedback visual suave enquanto consulta o banco e conecta à IA com retry e failover
+                _exibir_contador(contador)
                 with st.spinner("A consultar fornecedores e a calcular análise com a IA..."):
                     if usuario:
-                        contexto_banco = montar_contexto(
-                            *dados_planilha_para_contexto(*dados_usuario), date.today(),
-                            origem="PLANILHA ENVIADA PELO USUÁRIO",
-                        )
+                        dados = dados_planilha_para_contexto(*dados_usuario)
+                        origem_dados = "PLANILHA ENVIADA PELO USUÁRIO"
+                        contexto = montar_contexto(*dados, date.today(), origem=origem_dados)
+                        enxuto = montar_contexto(*dados, date.today(), origem=origem_dados, enxuto=True)
                     else:
-                        contexto_banco = extrair_contexto_executivo_estoque(engine)
-                    historico_recente = mensagens[-10:]
-
-                    stream_gerador = gerar_resposta_assistente_stream(
-                        mensagens=historico_recente,
-                        contexto_banco=contexto_banco,
-                        api_key=api_key,
-                        modelo=MODELO_PADRAO,
+                        contexto = extrair_contexto_executivo_estoque(engine)
+                        enxuto = extrair_contexto_executivo_estoque(engine, enxuto=True)
+                    resposta = obter_resposta(
+                        mensagens=mensagens[-10:], contexto_banco=contexto, api_key=api_key,
+                        chave_groq=chave_groq, contexto_enxuto=enxuto,
                     )
 
-                # Consome o stream com o componente nativo do Streamlit (100% completo, sem cortes)
-                resposta_completa = st.write_stream(stream_gerador)
-
-                # Salva a resposta no histórico da sessão
-                mensagens.append({"role": "assistant", "content": str(resposta_completa)})
+                # Entrega com efeito de digitação (100% completo, sem cortes)
+                st.write_stream(digitar(resposta.texto))
+                if resposta.origem:
+                    st.caption(_rotulo_origem(resposta.origem))
+                mensagens.append({"role": "assistant", "content": resposta.texto, "origem": resposta.origem})
