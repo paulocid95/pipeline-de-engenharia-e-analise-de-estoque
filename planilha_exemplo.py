@@ -139,6 +139,8 @@ def aba_vendas(df_estoque: pd.DataFrame, rng: random.Random, hoje: date) -> pd.D
 INSTRUCOES = [
     ("Supply Intelligence: planilha de exemplo", "titulo"),
     ("", None),
+    ("👉 OS DADOS ESTÃO NAS ABAS ABAIXO: Estoque, Cotações, Ocorrências e Vendas", "aviso"),
+    ("", None),
     ("Esta planilha tem os mesmos dados da demonstração, mas BAGUNÇADOS DE PROPÓSITO,", None),
     ("do jeito que costumam sair de sistemas e planilhas do dia a dia. Envie de volta pelo", None),
     ("botão \"Analisar minha planilha\" e veja a higienização acontecer.", None),
@@ -209,6 +211,9 @@ def montar_planilha_exemplo(
             celula = ws.cell(row=i, column=1, value=texto)
             if estilo == "titulo":
                 celula.font = Font(bold=True, size=16, color="2F62C9")
+            elif estilo == "aviso":
+                celula.font = Font(bold=True, size=13, color="7A4B00")
+                celula.fill = PatternFill("solid", fgColor="FFE08A")
             elif estilo == "sub":
                 celula.font = Font(bold=True, size=12)
         ws.column_dimensions["A"].width = 110
@@ -222,6 +227,10 @@ def montar_planilha_exemplo(
         ws.cell(row=linha_total, column=6, value=int(df_estoque["quantidade_disponivel"].sum())).font = Font(bold=True)
         _destacar_cabecalho(ws, 3)
         _ajustar_larguras(ws, inicio=3)
+
+        # Abas de dados coloridas na barra inferior do Excel
+        for nome, cor in (("Estoque", "2F62C9"), ("Cotações", "199E70"), ("Ocorrências", "D95926"), ("Vendas", "9085E9")):
+            writer.sheets[nome].sheet_properties.tabColor = cor
 
         for nome in ("Cotações", "Ocorrências", "Vendas"):
             ws = writer.sheets[nome]
