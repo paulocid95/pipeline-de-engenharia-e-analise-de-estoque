@@ -15,6 +15,7 @@ from sqlalchemy import text
 from sqlalchemy.engine import Engine
 import streamlit as st
 
+from datas_relativas import data_referencia, deslocar_datas, dias_desde
 from regras_fornecedores import (
     ROTULO_CLASSE,
     avaliar_cotacoes,
@@ -110,7 +111,8 @@ def extrair_contexto_executivo_estoque(_engine: Engine) -> str:
                 p.estoque_minimo,
                 f.quantidade_disponivel,
                 f.valor_total_estoque,
-                f.status_reposicao
+                f.status_reposicao,
+                f.data_carga
             FROM core.dim_produtos p
             LEFT JOIN core.dim_categorias c ON p.id_categoria = c.id_categoria
             LEFT JOIN core.fato_estoque f ON p.id_produto = f.id_produto
@@ -145,6 +147,10 @@ def extrair_contexto_executivo_estoque(_engine: Engine) -> str:
     except Exception:
         logger.exception("Histórico de ocorrências indisponível para o assistente")
         df_oc = pd.DataFrame(columns=["fornecedor", "tipo", "gravidade", "data_ocorrencia", "status", "data_resolucao"])
+
+    # Datas relativas: a demonstração não envelhece (mesma regra do painel)
+    dias = dias_desde(data_referencia(df_est["data_carga"]), date.today())
+    df_oc = deslocar_datas(df_oc, ["data_ocorrencia", "data_resolucao"], dias)
 
     # Ranking de risco e melhor opção por produto (mesmas regras do painel)
     ranking = pd.DataFrame()

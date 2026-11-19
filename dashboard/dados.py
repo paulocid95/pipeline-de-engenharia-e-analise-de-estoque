@@ -2,6 +2,7 @@
 
 import os
 import time
+from datetime import date
 from pathlib import Path
 
 import pandas as pd
@@ -9,6 +10,7 @@ import streamlit as st
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
 
+from datas_relativas import data_referencia, deslocar_datas, dias_desde
 from db import normalizar_url_banco
 from regras_estoque import classificar_status
 
@@ -73,6 +75,16 @@ def executar_query_com_retry(query_str: str, max_tentativas: int = 3) -> pd.Data
     raise ultimo_erro
 
 
+@st.cache_data(ttl=300)
+def dias_desde_ultima_carga() -> int:
+    """Dias entre a última carga do pipeline e hoje (base das datas relativas da demonstração)."""
+    try:
+        df = executar_query_com_retry("SELECT MAX(data_carga) AS data_carga FROM core.fato_estoque;")
+    except Exception:
+        return 0
+    return dias_desde(data_referencia(df["data_carga"]), date.today())
+
+
 # ==============================================================================
 # 3. CONSULTA ANALÍTICA COM CACHE E ENRIQUECIMENTO DIMENSIONAL
 # ==============================================================================
@@ -128,6 +140,7 @@ def carregar_dados_analiticos() -> pd.DataFrame:
             mapa_forn = dict(zip(df_csv["id_produto"], df_csv["fornecedor"]))
             df_raw["fornecedor"] = df_raw["fornecedor"].replace("Não Informado", pd.NA).fillna(df_raw["sku"].map(mapa_forn)).fillna("Não Informado")
 
+    df_raw = deslocar_datas(df_raw, ["data_carga"], dias_desde(data_referencia(df_raw["data_carga"]), date.today()))
     return df_raw.sort_values(by="valor_total_estoque", ascending=False)
 
 
@@ -163,7 +176,7 @@ def carregar_dados_cotacoes() -> pd.DataFrame:
         ORDER BY p.sku, c.preco_cotado ASC;
     """
     try:
-        return executar_query_com_retry(query)
+        return deslocar_datas(executar_query_com_retry(query), ["data_cotacao"], dias_desde_ultima_carga())
     except Exception:
         return pd.DataFrame(columns=[
             "id_cotacao", "sku", "nome_produto", "nome_categoria", "preco_referencia",
@@ -191,9 +204,10 @@ def carregar_ocorrencias() -> pd.DataFrame:
         ORDER BY o.data_ocorrencia DESC;
     """
     try:
-        return executar_query_com_retry(query)
+        df = executar_query_com_retry(query)
     except Exception:
         return pd.DataFrame(columns=[
             "id_ocorrencia", "fornecedor", "nome_produto", "tipo", "gravidade",
             "data_ocorrencia", "status", "data_resolucao", "descricao",
         ])
+    return deslocar_datas(df, ["data_ocorrencia", "data_resolucao"], dias_desde_ultima_carga())
