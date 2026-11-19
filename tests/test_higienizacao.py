@@ -9,7 +9,8 @@ from higienizacao import (
 from higienizacao.colunas import detectar_tipo, encontrar_cabecalho, mapear_colunas
 from higienizacao.conversores import para_data, para_numero
 from higienizacao.entidades import (
-    categoria_padrao, chave_fornecedor, gravidade, nome_de_exibicao, parecidos, status_ocorrencia, tipo_ocorrencia,
+    categoria_padrao, chave_fornecedor, contido, gravidade, loja_de_eletronicos, nome_de_exibicao, parecidos,
+    status_ocorrencia, tipo_ocorrencia,
 )
 from planilha_exemplo import montar_planilha_exemplo
 from regras_fornecedores import calcular_penalidades, ranking_fornecedores
@@ -370,3 +371,67 @@ def test_ranking_sem_historico_nao_diz_que_o_historico_e_limpo():
         "fornecedor", "tipo", "gravidade", "data_ocorrencia", "status", "data_resolucao"]), HOJE,
         chave_produto="sku", coluna_fornecedor="fornecedor_cotacao")
     assert ranking["motivo"].str.startswith("Sem histórico de ocorrências").all()
+
+
+# ------------------------------------------------------------------------------
+# Planilhas de outros ramos (testadas com a exportação de um pet shop)
+# ------------------------------------------------------------------------------
+def test_nome_contido_no_outro():
+    assert contido("mundo pet", "mundo pet atacado")
+    assert contido("nutrivale", "nutrivale distribuidora")          # só muda a palavra genérica
+    assert contido("casa do criador", "casa do criador atacadista")
+    assert not contido("fornecedor a", "fornecedor b")
+    assert not contido("pet", "mundo pet")                            # nome curto demais para decidir
+    assert not contido("mundo pet", "mundo pet")
+
+
+def test_fornecedor_com_palavras_a_mais_ja_vem_unido_e_pode_ser_separado():
+    estoque = _csv("Produto;Qtd;Preço;Fornecedor\nRação;5;50;MUNDO PET ATACADO EIRELI\nAreia;9;10;Vetfarma\n")
+    cotacoes = _csv("Produto;Fornecedor;Valor\nRação;Mundo Pet;40\nRação;Mundo Pet Atacado;41\n"
+                    "Areia;VetFarma Distribuidora;9\nAreia;Vetfarma Distribuidora Veterinaria;9,5\n")
+    ocorrencias = _csv("Fornecedor;Tipo;Data;Gravidade\nMundo Pet;Processo no PROCON;01/02/2026;Crítica\n")
+    arquivos = (("estoque.csv", estoque), ("cotacoes.csv", cotacoes), ("ocorrencias.csv", ocorrencias))
+    r = _limpar_csvs(*arquivos)
+
+    assert r.duvidas and all(d.sugerida for d in r.duvidas)
+    assert sorted(d.a for d in r.duvidas if "Mundo" in d.b) == ["Mundo Pet"]          # uma pergunta por nome
+    assert len([d for d in r.duvidas if "farma" in d.b.lower()]) == 2
+    assert r.cotacoes["fornecedor_cotacao"].nunique() == 2
+    assert r.ocorrencias["fornecedor"].iloc[0] in set(r.cotacoes["fornecedor_cotacao"])   # risco não se perde
+
+    mundo = next(d for d in r.duvidas if "Mundo" in d.b)
+    separado = _limpar_csvs(*arquivos, decisoes={mundo.chave: False})
+    assert separado.cotacoes["fornecedor_cotacao"].nunique() == 3
+
+
+def test_categorias_de_outro_ramo_nao_viram_eletronicos():
+    estoque = _csv("Descrição;Grupo;Saldo;Custo\nCOLEIRA NYLON M;ACESSORIOS;3;12\nFONTE BEBEDOURO GATOS;ACESSORIOS;1;75\n"
+                   "RACAO CAES 15KG;RACOES;9;130\nRACAO GATOS 1KG;Racoes;20;17\nRACAO FILHOTES 3KG;;4;43\n"
+                   "ESCOVA CABO MADEIRA;;2;18\n")
+    r = _limpar_csvs(("estoque.csv", estoque))
+    categorias = dict(zip(r.estoque["nome_produto"], r.estoque["nome_categoria"]))
+    assert categorias["FONTE BEBEDOURO GATOS"] == "Acessorios"
+    assert categorias["RACAO CAES 15KG"] == categorias["RACAO GATOS 1KG"] == "Racoes"
+    assert categorias["RACAO FILHOTES 3KG"] == "Racoes"                 # deduzida pelos produtos parecidos
+    assert categorias["ESCOVA CABO MADEIRA"] == "Outros"                # nada parecido na planilha
+
+
+def test_planilha_de_eletronicos_continua_com_as_categorias_do_ramo():
+    assert loja_de_eletronicos(["iPhone 13", "Fone JBL", "Carregador 20W", "Capinha"])
+    assert not loja_de_eletronicos(["Ração 15kg", "Fonte bebedouro", "Areia 4kg"])
+    r = _limpar_csvs(("estoque.csv", _csv("Produto;Categoria;Qtd;Preço\niPhone 13;celular;2;3999\nFone JBL;;5;199\n")))
+    assert set(r.estoque["nome_categoria"]) == {"Smartphones", "Fones de Ouvido"}
+
+
+@pytest.mark.parametrize("cabecalhos", [
+    ["Descrição", "Saldo", "Custo Unit.", "Preço Venda"],
+    ["Descrição", "Saldo", "Preço Venda", "Custo Unit."],
+    ["Descrição", "Saldo", "Preço", "Custo"],
+])
+def test_preco_de_compra_vence_o_de_venda(cabecalhos):
+    mapa = mapear_colunas(cabecalhos, ESTOQUE)
+    assert "custo" in cabecalhos[mapa["preco"]].lower()
+
+
+def test_so_preco_de_venda_ainda_e_reconhecido():
+    assert mapear_colunas(["Descrição", "Saldo", "Preço Venda"], ESTOQUE)["preco"] == 2

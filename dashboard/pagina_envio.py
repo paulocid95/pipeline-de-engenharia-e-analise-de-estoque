@@ -296,17 +296,24 @@ def _resumo(resultado) -> None:
 def _duvidas(resultado, alerta, excesso) -> None:
     if not resultado.duvidas:
         return
-    st.warning(f"🤔 Encontramos **{len(resultado.duvidas)}** caso(s) que parecem ser a mesma coisa escrita de "
-               "jeitos diferentes. Confirme para unirmos; sem confirmação, eles ficam separados.")
+    aviso = (f"🤔 Encontramos **{len(resultado.duvidas)}** caso(s) que parecem ser a mesma coisa escrita de "
+             "jeitos diferentes.")
+    if any(d.sugerida for d in resultado.duvidas):
+        aviso += (" Quando um nome contém o outro (ex.: “Mundo Pet” e “Mundo Pet Atacado”) já unimos: "
+                  "marque **Manter separados** se forem empresas diferentes. Os demais só são unidos se você confirmar.")
+    else:
+        aviso += " Confirme para unirmos; sem confirmação, eles ficam separados."
+    st.warning(aviso)
     decisoes = st.session_state.setdefault(K_DECISOES, {})
     with st.form("envio_form_duvidas", border=True):
         escolhas = {}
         for i, d in enumerate(resultado.duvidas):
             tipo = "Fornecedor" if d.tipo == "fornecedor" else "Produto"
+            detalhe = "um nome contém o outro" if d.sugerida else f"{d.similaridade:.0%} parecidos"
             escolhas[d.chave] = st.segmented_control(
-                f"{tipo}: **{d.a}** parece ser **{d.b}**? ({d.similaridade:.0%} parecidos)",
+                f"{tipo}: **{d.a}** parece ser **{d.b}**? ({detalhe})",
                 options=["Unir", "Manter separados"],
-                default="Unir" if decisoes.get(d.chave) else "Manter separados",
+                default="Unir" if decisoes.get(d.chave, d.sugerida) else "Manter separados",
                 key=f"envio_duvida_{i}",
             )
         if st.form_submit_button("✔️ Aplicar decisões", type="primary"):

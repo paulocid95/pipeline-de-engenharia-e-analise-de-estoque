@@ -51,11 +51,46 @@ def parecidos(a: str, b: str, limite: float = 0.8) -> float | None:
     return razao if razao >= limite else None
 
 
+def contido(a: str, b: str) -> bool:
+    """Um nome é o outro com palavras a mais: 'mundo pet' e 'mundo pet atacado', 'nutrivale' e
+    'nutrivale distribuidora'. Palavras genéricas não contam e o nome menor precisa ter ao menos 4 letras."""
+    pa = {p for p in a.split() if p not in _PALAVRAS_GENERICAS}
+    pb = {p for p in b.split() if p not in _PALAVRAS_GENERICAS}
+    if a == b or not pa or not pb:
+        return False
+    menor, maior = sorted((pa, pb), key=len)
+    return menor <= maior and len("".join(menor)) >= 4
+
+
 # ------------------------------------------------------------------------------
 # Categorias
 # ------------------------------------------------------------------------------
+CATEGORIA_OUTROS = "Outros"
+
+
+def loja_de_eletronicos(produtos) -> bool:
+    """A tradução de categorias de eletrônicos ('celular' → Smartphones) só vale quando a maioria dos
+    produtos é de eletrônicos; num pet shop, 'ACESSORIOS' não pode virar 'Carregadores'."""
+    nomes = [p for p in produtos if limpar_texto(p)]
+    return bool(nomes) and sum(deduzir_categoria(p, "") != CATEGORIA_OUTROS for p in nomes) * 2 >= len(nomes)
+
+
+def nome_de_categoria(variantes) -> str:
+    """Melhor grafia de uma categoria da planilha: 'RACOES' → 'Racoes', 'vestuário' → 'Vestuário'."""
+    melhor = melhor_variante(variantes)
+    if melhor == melhor.upper():
+        melhor = melhor.capitalize()
+    return melhor[:1].upper() + melhor[1:]
+
+
+def deduzir_pela_planilha(produto, categoria_por_palavra: dict) -> str:
+    """Categoria de um produto sem categoria, pelos produtos da planilha que começam com a mesma palavra."""
+    palavras = normalizar(produto).split()
+    return categoria_por_palavra.get(palavras[0], CATEGORIA_OUTROS) if palavras else CATEGORIA_OUTROS
+
+
 def categoria_padrao(categoria, produto) -> tuple[str, bool]:
-    """Categoria final e se ela foi deduzida (vazia na planilha)."""
+    """Categoria final e se ela foi deduzida (vazia na planilha), para lojas de eletrônicos."""
     cat = limpar_texto(categoria)
     if not cat:
         return deduzir_categoria(produto, ""), True

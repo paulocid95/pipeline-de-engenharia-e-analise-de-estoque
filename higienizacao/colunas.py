@@ -106,6 +106,21 @@ def _pontuar(cabecalho: str, nomes: list[str]) -> int:
     return melhor
 
 
+# Com "Custo" e "Preço Venda" na mesma planilha, o preço usado é o de compra: é ele que vale para o
+# valor do estoque e para comparar com as cotações dos fornecedores.
+_PRECO_DE_COMPRA = {"custo", "compra"}
+_PRECO_DE_VENDA = {"venda", "varejo", "sugerido", "promocao", "promocional", "tabela"}
+
+
+def _ajustar_preco(cabecalho: str, pontos: int) -> int:
+    palavras = set(cabecalho.split())
+    if palavras & _PRECO_DE_COMPRA:
+        return pontos + 3
+    if palavras & _PRECO_DE_VENDA:
+        return max(1, pontos - 3)
+    return pontos
+
+
 def mapear_colunas(cabecalhos: list, tipo: str) -> dict[str, int]:
     """Coluna canônica -> índice da coluna na tabela. Cada coluna é usada uma única vez."""
     normalizados = [normalizar(c) for c in cabecalhos]
@@ -113,6 +128,8 @@ def mapear_colunas(cabecalhos: list, tipo: str) -> dict[str, int]:
     for canonica, nomes in ESQUEMAS[tipo].items():
         for i, cab in enumerate(normalizados):
             pontos = _pontuar(cab, nomes)
+            if pontos and canonica == "preco":
+                pontos = _ajustar_preco(cab, pontos)
             if pontos:
                 candidatos.append((pontos, canonica, i))
     mapa: dict[str, int] = {}

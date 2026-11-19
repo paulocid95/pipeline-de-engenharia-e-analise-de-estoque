@@ -1,5 +1,6 @@
 """Orquestra a higienização: das tabelas brutas aos DataFrames no formato do painel, com relatório."""
 
+from collections import Counter
 from dataclasses import dataclass, field
 from datetime import date, datetime
 
@@ -48,6 +49,7 @@ class Duvida:
     a: str               # como aparece na planilha
     b: str               # com quem parece ser o mesmo
     similaridade: float
+    sugerida: bool = False   # um nome contém o outro: já vem unido, e o usuário pode separar
 
     @property
     def chave(self) -> tuple:
@@ -198,17 +200,35 @@ def higienizar(
     uso = {k: 0 for k in chaves}
     for v in variantes:
         uso[ent.chave_fornecedor(v)] = uso.get(ent.chave_fornecedor(v), 0) + 1
-    pares_unidos = []
+    def principal(nomes) -> str:
+        # O nome mais usado (e, no empate, o mais completo) é o que fica
+        return max(nomes, key=lambda k: (uso[k], len(k)))
+
+    pares_unidos, contidos = [], []
     for i, a in enumerate(chaves):
         for b in chaves[i + 1:]:
-            sim = ent.parecidos(a, b)
-            if sim:
-                # O nome mais usado (e, no empate, o mais completo) é o que fica
-                fica, sai = sorted((a, b), key=lambda k: (uso[k], len(k)), reverse=True)
+            if ent.contido(a, b):
+                contidos.append((a, b))
+            elif sim := ent.parecidos(a, b):
+                fica = principal((a, b))
+                sai = b if fica == a else a
                 duvida = Duvida("fornecedor", exibicao[sai], exibicao[fica], round(sim, 2))
                 res.duvidas.append(duvida)
                 if decisoes.get(duvida.chave):
                     pares_unidos.append((fica, sai))
+    # Nomes contidos um no outro formam grupos ("Vetfarma" ⊂ "Vetfarma Distribuidora" ⊂ ...): cada nome
+    # vira uma única pergunta, já marcada para unir ao nome principal do grupo.
+    grupos: dict[str, list] = {}
+    for nome, raiz in _uniao(contidos).items():
+        grupos.setdefault(raiz, [raiz]).append(nome)
+    for membros in grupos.values():
+        fica = principal(membros)
+        for sai in sorted(m for m in membros if m != fica):
+            razao = ent.SequenceMatcher(None, sai, fica).ratio()
+            duvida = Duvida("fornecedor", exibicao[sai], exibicao[fica], round(razao, 2), sugerida=True)
+            res.duvidas.append(duvida)
+            if decisoes.get(duvida.chave, True):
+                pares_unidos.append((fica, sai))
     destino = _uniao(pares_unidos)
 
     def fornecedor(valor) -> str:
@@ -270,6 +290,37 @@ def higienizar(
 # ------------------------------------------------------------------------------
 # Estoque
 # ------------------------------------------------------------------------------
+def _categorias_da_planilha(linhas: list[dict]) -> tuple[int, int, list]:
+    """Lojas que não são de eletrônicos: mantém as categorias do usuário, só unificando a grafia
+    ('RACOES' e 'Racoes' viram 'Racoes'), e deduz as vazias por produtos que começam com a mesma palavra."""
+    grafias: dict[str, list] = {}
+    for l in linhas:
+        if l["categoria"]:
+            grafias.setdefault(normalizar(l["categoria"]), []).append(l["categoria"])
+    nomes = {k: ent.nome_de_categoria(v) for k, v in grafias.items()}
+
+    contagem: dict[str, Counter] = {}
+    for l in linhas:
+        palavras = normalizar(l["produto"]).split()
+        if l["categoria"] and palavras:
+            contagem.setdefault(palavras[0], Counter())[nomes[normalizar(l["categoria"])]] += 1
+    por_palavra = {p: c.most_common(1)[0][0] for p, c in contagem.items()}
+
+    deduzidas = padronizadas = 0
+    exemplos = []
+    for l in linhas:
+        bruta = l["categoria"]
+        if not bruta:
+            l["categoria"] = ent.deduzir_pela_planilha(l["produto"], por_palavra)
+            deduzidas += 1
+            continue
+        l["categoria"] = nomes[normalizar(bruta)]
+        if l["categoria"] != bruta:
+            padronizadas += 1
+            exemplos.append((bruta, l["categoria"]))
+    return deduzidas, padronizadas, exemplos
+
+
 def _estoque(df, col, fornecedor, nomes_por_sku, limite_alerta, limite_excesso) -> pd.DataFrame:
     linhas = []
     precos_texto = _contar_texto(df["preco"])
@@ -277,6 +328,7 @@ def _estoque(df, col, fornecedor, nomes_por_sku, limite_alerta, limite_excesso) 
                     and str(para_numero(v)).rstrip("0").rstrip(".") != v.strip() for v in df["quantidade"])
     vazias = negativas = deduzidas = sinonimos = 0
     ex_cat, ex_preco = [], []
+    eletronicos = ent.loja_de_eletronicos(df["produto"].map(limpar_texto))
     for r in df.to_dict("records"):
         preco = para_numero(r["preco"])
         if preco is None or preco <= 0:
@@ -298,19 +350,26 @@ def _estoque(df, col, fornecedor, nomes_por_sku, limite_alerta, limite_excesso) 
             qtd = 0
         produto = limpar_texto(r["produto"]) or _txt(r["sku"])
         sku = _txt(r["sku"]) or None
-        cat_bruta = r.get("categoria")
-        categoria, deduzida = ent.categoria_padrao(cat_bruta, produto)
-        if deduzida:
-            deduzidas += 1
-        elif limpar_texto(cat_bruta) != categoria:
-            sinonimos += 1
-            ex_cat.append((limpar_texto(cat_bruta), categoria))
+        cat_bruta = limpar_texto(r.get("categoria"))
+        if eletronicos:
+            categoria, deduzida = ent.categoria_padrao(cat_bruta, produto)
+            if deduzida:
+                deduzidas += 1
+            elif cat_bruta != categoria:
+                sinonimos += 1
+                ex_cat.append((cat_bruta, categoria))
+        else:
+            categoria = cat_bruta            # padronizada depois, olhando a planilha inteira
         minimo = para_numero(r.get("estoque_minimo"))
         linhas.append({
             "sku": sku, "produto": produto, "categoria": categoria, "fornecedor": fornecedor(r["fornecedor"]),
             "preco": round(preco, 2), "quantidade": int(round(qtd)),
             "estoque_minimo": int(minimo) if minimo is not None and minimo > 0 else None,
         })
+
+    if not eletronicos:
+        d, s, ex = _categorias_da_planilha(linhas)
+        deduzidas, sinonimos, ex_cat = d, s, ex
 
     df = pd.DataFrame(linhas)
     if df.empty:
