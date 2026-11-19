@@ -7,8 +7,8 @@ Siga o passo a passo abaixo para clonar, configurar e executar todos os estágio
 ### 1. Clonar o Repositório
 
 ```bash
-git clone https://github.com/paulocid95/pipeline-de-engenharia-e-analise-de-estoque.git
-cd pipeline-de-engenharia-e-analise-de-estoque
+git clone https://github.com/paulocid95/supply-intelligence.git
+cd supply-intelligence
 ```
 
 ### 2. Configurar o Ambiente Virtual

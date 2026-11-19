@@ -71,8 +71,8 @@ ETL pipeline (demo) ──▶ Neon Postgres ┘          │
 ## ⚡ Run locally
 
 ```bash
-git clone https://github.com/paulocid95/pipeline-de-engenharia-e-analise-de-estoque.git
-cd pipeline-de-engenharia-e-analise-de-estoque
+git clone https://github.com/paulocid95/supply-intelligence.git
+cd supply-intelligence
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 streamlit run app.py

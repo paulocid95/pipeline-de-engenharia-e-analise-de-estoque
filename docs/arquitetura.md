@@ -77,7 +77,7 @@ Além do pipeline acima (dados da demonstração), o app aceita **a planilha do 
 ### Estrutura do diretório
 
 ```text
-pipeline-analise-estoque-python/
+supply-intelligence/
 │
 ├── app.py                          # Entrada do Streamlit: página inicial, envio de planilha ou painel
 ├── dashboard/                      # Interface

@@ -15,7 +15,7 @@ import streamlit as st
 from planilha_exemplo import NOME_ARQUIVO, montar_planilha_exemplo
 
 PASTA = Path(__file__).parent / "inicio"
-URL_GITHUB = "https://github.com/paulocid95/pipeline-de-engenharia-e-analise-de-estoque"
+URL_GITHUB = "https://github.com/paulocid95/supply-intelligence"
 
 
 @cache
